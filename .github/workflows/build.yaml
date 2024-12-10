@@ -15,7 +15,6 @@ jobs:
         java: [11, 13]
         module:
           - org.matsim.run.**
-          - org.matsim.episim.**
 
     steps:
       - uses: actions/checkout@v2

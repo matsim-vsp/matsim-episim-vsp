@@ -3,10 +3,10 @@
 
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.matsim-org</groupId>
-    <artifactId>matsim-episim</artifactId>
-    <version>24.8</version>
+    <artifactId>matsim-episim-vsp</artifactId>
+    <version>2025.1</version>
 
-    <name>MATSim Episim</name>
+    <name>MATSim Episim Scenarios</name>
     <description>Epidemic simulation for MATSim</description>
     <organization>
         <name>matsim-org</name>
@@ -20,7 +20,7 @@
     </licenses>
 
     <properties>
-        <matsim.version>13.0</matsim.version>
+        <matsim.episim.version>2025.1</matsim.episim.version>
         <!--<matsim.version>12.0-2020w09-SNAPSHOT</matsim.version>-->
         <mainClass>org.matsim.run.RunEpisim</mainClass>
     </properties>
@@ -78,101 +78,20 @@
             <url>https://mvnrepository.com/artifact/tech.tablesaw/tablesaw-core</url>
         </repository>
 
-    </repositories>
-
-    <distributionManagement>
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
             <url>https://maven.pkg.github.com/matsim-org/matsim-episim-libs</url>
         </repository>
-    </distributionManagement>
+
+    </repositories>
 
     <dependencies>
 
-        <!-- This is the matsim "core": -->
         <dependency>
-            <groupId>org.matsim</groupId>
-            <artifactId>matsim</artifactId>
-            <version>${matsim.version}</version>
-        </dependency>
-
-        <!-- Config file for policies -->
-        <dependency>
-            <groupId>com.typesafe</groupId>
-            <artifactId>config</artifactId>
-            <version>1.4.0</version>
-        </dependency>
-
-        <!-- Command line interface -->
-        <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli</artifactId>
-            <version>4.3.2</version>
-        </dependency>
-
-        <!-- Needed for high-throughput logging -->
-        <dependency>
-            <groupId>com.lmax</groupId>
-            <artifactId>disruptor</artifactId>
-            <version>3.4.2</version>
-        </dependency>
-        <!-- Prefix tree for activity matching -->
-        <dependency>
-            <groupId>com.github.ClickerMonkey</groupId>
-            <artifactId>TrieHard</artifactId>
-            <version>1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>2.7</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-math3</artifactId>
-            <version>3.6.1</version>
-        </dependency>
-        <dependency>
-            <groupId>it.unimi.dsi</groupId>
-            <artifactId>fastutil</artifactId>
-            <version>8.5.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jgrapht</groupId>
-            <artifactId>jgrapht-core</artifactId>
-            <version>1.5.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jgrapht</groupId>
-            <artifactId>jgrapht-io</artifactId>
-            <version>1.5.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-            <version>2.10.2</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>2.10.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.matsim.contrib</groupId>
-            <artifactId>vsp</artifactId>
-            <version>${matsim.version}</version>
-
-            <exclusions>
-                <!-- This one causes dependency errors and we don't it anyway -->
-                <exclusion>
-                    <groupId>org.matsim.contrib</groupId>
-                    <artifactId>parking</artifactId>
-                </exclusion>
-            </exclusions>
-
+            <groupId>com.github.matsim-org</groupId>
+            <artifactId>matsim-episim-libs</artifactId>
+            <version>${matsim.episim.version}</version>
         </dependency>
 
         <!-- Include the JUnit testing library.  Not transitive. -->
@@ -180,15 +99,6 @@
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.13.1</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <!--MATSim test infrastructure.  Not transitive.-->
-            <groupId>org.matsim</groupId>
-            <artifactId>matsim</artifactId>
-            <type>test-jar</type>
-            <version>${matsim.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -216,33 +126,6 @@
             <version>1.23</version>
             <scope>test</scope>
         </dependency>
-
-        <dependency>
-            <groupId>tech.tablesaw</groupId>
-            <artifactId>tablesaw-core</artifactId>
-            <version>0.38.1</version>
-        </dependency>
-        <dependency>
-            <groupId>tech.tablesaw</groupId>
-            <artifactId>tablesaw-jsplot</artifactId>
-            <version>0.38.1</version>
-        </dependency>
-        <!--        <dependency>-->
-        <!--            <groupId>tech.tablesaw</groupId>-->
-        <!--            <artifactId>tablesaw-html</artifactId>-->
-        <!--            <version>LATEST</version>-->
-        <!--        </dependency>-->
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi</artifactId>
-            <version>4.1.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.poi</groupId>
-            <artifactId>poi-ooxml</artifactId>
-            <version>4.1.2</version>
-        </dependency>
-
     </dependencies>
 
     <build>
