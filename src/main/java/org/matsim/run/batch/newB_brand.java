@@ -109,7 +109,7 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 				map.clear();
 			}
 
-			episimConfig.setOdeIncidenceFile(SnzBrandenburgProductionScenario.INPUT.resolve("ode_be_infectious_250211.csv").toString());
+			episimConfig.setOdeIncidenceFile(SnzBerlinProductionScenario.INPUT.resolve("ode_be_infectious_250211.csv").toString());
 
 			episimConfig.setOdeDistricts(List.of("Berlin"));
 			episimConfig.setOdeCouplingFactor(params.ode);

@@ -89,6 +89,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 			return new SnzBerlinProductionScenario(this);
 		}
 	}
+	public static final List<String> BRANDENBURG_LANDKREISE = List.of("Elbe-Elster", "Barnim", "Prignitz", "Uckermark", "Oberspreewald-Lausitz", "Potsdam-Mittelmark", "Märkisch-Oderland", "Oberhavel", "Ostprignitz-Ruppin", "Potsdam", "Brandenburg an der Havel", "Frankfurt (Oder)", "Dahme-Spreewald", "Teltow-Fläming", "Oder-Spree", "Havelland", "Cottbus", "Spree-Neiße");
 
 	public enum Snapshot {no, episim_snapshot_060_2020_04_24, episim_snapshot_120_2020_06_23, episim_snapshot_180_2020_08_22, episim_snapshot_240_2020_10_21}
 

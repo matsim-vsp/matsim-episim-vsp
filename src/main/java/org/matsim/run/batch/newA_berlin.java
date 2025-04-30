@@ -8,7 +8,6 @@ import org.matsim.episim.EpisimConfigGroup;
 import org.matsim.episim.analysis.OutputAnalysis;
 import org.matsim.run.RunParallel;
 import org.matsim.run.modules.SnzBerlinProductionScenario;
-import org.matsim.run.modules.SnzBrandenburgProductionScenario;
 import org.matsim.run.modules.SnzProductionScenario;
 
 import javax.annotation.Nullable;
@@ -96,7 +95,7 @@ public class newA_berlin implements BatchRun<newA_berlin.Params> {
 			episimConfig.setOdeIncidenceFile(SnzBerlinProductionScenario.INPUT.resolve("ode_br_infectious_250212.csv").toString());
 			//		episimConfig.setOdeIncidenceFile(SnzBerlinProductionScenario.INPUT.resolve("ode_inputs/left_s.csv").toString());
 
-			episimConfig.setOdeDistricts(SnzBrandenburgProductionScenario.BRANDENBURG_LANDKREISE);
+			episimConfig.setOdeDistricts(SnzBerlinProductionScenario.BRANDENBURG_LANDKREISE);
 
 			episimConfig.setOdeCouplingFactor(params.ode);
 

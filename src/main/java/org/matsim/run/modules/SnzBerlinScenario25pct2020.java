@@ -62,8 +62,8 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 	 * The base policy based on actual restrictions in the past and mobility data
 	 */
 	private static ShutdownPolicy.ConfigBuilder<?> basePolicy(RestrictionInput activityParticipation, Map<String, Double> ciCorrections,
-														   long introductionPeriod, Double maskCompliance, boolean restrictSchoolsAndDayCare,
-														   boolean restrictUniversities) throws IOException {
+															  long introductionPeriod, Double maskCompliance, boolean restrictSchoolsAndDayCare,
+															  boolean restrictUniversities) throws IOException {
 		// note that there is already a builder around this
 		ConfigBuilder restrictions;
 
@@ -75,69 +75,69 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 
 		if (restrictSchoolsAndDayCare) {
 			restrictions.restrict("2020-03-14", 0.1, "educ_primary", "educ_kiga")
-			.restrict("2020-03-14", 0., "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2020-05-11", 0.3, "educ_primary")
-			.restrict("2020-05-11", 0.2, "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2020-05-25", 0.3, "educ_kiga")
-			.restrict("2020-06-08", 0.5, "educ_kiga")
-			.restrict("2020-06-22", 1., "educ_kiga")
-			//Sommerferien
-			.restrict("2020-06-25", 0.2, "educ_primary")
-			//Ende der Sommerferien
-			.restrict("2020-08-08", 1., "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Lueften nach den Sommerferien
-			.restrict("2020-08-08", Restriction.ofCiCorrection(0.5), "educ_primary", "educ_kiga", "educ_secondary", "educ_higher", "educ_tertiary", "educ_other")
-			//Herbstferien
-			.restrict("2020-10-12", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2020-10-25", 1., "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Weihnachtsferien (vorgezogen)
-			.restrict("2020-12-16", 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2020-03-14", 0., "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2020-05-11", 0.3, "educ_primary")
+				.restrict("2020-05-11", 0.2, "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2020-05-25", 0.3, "educ_kiga")
+				.restrict("2020-06-08", 0.5, "educ_kiga")
+				.restrict("2020-06-22", 1., "educ_kiga")
+				//Sommerferien
+				.restrict("2020-06-25", 0.2, "educ_primary")
+				//Ende der Sommerferien
+				.restrict("2020-08-08", 1., "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Lueften nach den Sommerferien
+				.restrict("2020-08-08", Restriction.ofCiCorrection(0.5), "educ_primary", "educ_kiga", "educ_secondary", "educ_higher", "educ_tertiary", "educ_other")
+				//Herbstferien
+				.restrict("2020-10-12", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2020-10-25", 1., "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Weihnachtsferien (vorgezogen)
+				.restrict("2020-12-16", 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
 //			.restrict("2021-01-03", 1., "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2021-01-03", 0.5, "educ_kiga")
-			.restrict("2021-01-03", 0.3, "educ_primary")
+				.restrict("2021-01-03", 0.5, "educ_kiga")
+				.restrict("2021-01-03", 0.3, "educ_primary")
 //			//Winterferien
-			.restrict("2021-02-01", 0.2, "educ_primary")
-			.restrict("2021-02-07", 0.3, "educ_primary")
+				.restrict("2021-02-01", 0.2, "educ_primary")
+				.restrict("2021-02-07", 0.3, "educ_primary")
 
 //			.restrict("2021-02-22", 1., "educ_primary", "educ_secondary", "educ_tertiary", "educ_other",  "educ_kiga")
-			.restrict("2021-02-22", .5, "educ_primary")
-			.restrict("2021-02-22", .5, "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2021-02-22", .5, "educ_primary")
+				.restrict("2021-02-22", .5, "educ_secondary", "educ_tertiary", "educ_other")
 
-			//Osterferien
-			.restrict("2021-03-29", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2021-04-11", 0.5, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Sommerferien
-			.restrict("2021-06-24", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2021-08-09", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other", "educ_kiga")
-			//Herbstferien
-			.restrict("2021-10-11", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2021-10-25", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Weihnachtsferien
-			.restrict("2021-12-21", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2022-01-04", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			// ** 2022 **
-			//Winterferien
-			.restrict("2022-01-29", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2022-02-05", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Osterferien
-			.restrict("2022-04-11", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2022-04-23", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Sommerferien
-			.restrict("2022-07-07", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2022-08-19", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Herbstferien
-			.restrict("2022-10-24", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2022-11-05", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			//Weihnachtsferien
-			.restrict("2022-12-22", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
-			.restrict("2023-01-02", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Osterferien
+				.restrict("2021-03-29", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2021-04-11", 0.5, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Sommerferien
+				.restrict("2021-06-24", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2021-08-09", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other", "educ_kiga")
+				//Herbstferien
+				.restrict("2021-10-11", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2021-10-25", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Weihnachtsferien
+				.restrict("2021-12-21", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2022-01-04", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				// ** 2022 **
+				//Winterferien
+				.restrict("2022-01-29", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2022-02-05", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Osterferien
+				.restrict("2022-04-11", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2022-04-23", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Sommerferien
+				.restrict("2022-07-07", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2022-08-19", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Herbstferien
+				.restrict("2022-10-24", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2022-11-05", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				//Weihnachtsferien
+				.restrict("2022-12-22", 0.2, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
+				.restrict("2023-01-02", 1.0, "educ_primary", "educ_secondary", "educ_tertiary", "educ_other")
 
 			;
 		}
 
 		if (restrictUniversities ) {
 			restrictions.restrict("2020-03-14", 0., "educ_higher")
-			.restrict("2020-05-11", 0.2, "educ_higher");
+				.restrict("2020-05-11", 0.2, "educ_higher");
 			//TODO: what happened to higher education in 2021/2022
 		}
 
@@ -166,7 +166,7 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 					FaceMask.CLOTH, clothFraction * ii / introductionPeriod,
 					FaceMask.N95, ffpFraction * ii / introductionPeriod,
 					FaceMask.SURGICAL, surgicalFraction * ii / introductionPeriod)),
-					"pt", "shop_daily", "shop_other", "errands");
+				"pt", "shop_daily", "shop_other", "errands");
 		}
 
 		// mask compliance according to bvg
@@ -174,45 +174,45 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 				FaceMask.CLOTH, 0.8 * 1./3.,
 				FaceMask.N95, 0.8 * 1./3.,
 				FaceMask.SURGICAL, 0.8 * 1./3.)),
-				"pt", "shop_daily", "shop_other", "errands");
+			"pt", "shop_daily", "shop_other", "errands");
 		restrictions.restrict(LocalDate.parse("2020-07-01"), Restriction.ofMask(Map.of(
 				FaceMask.CLOTH, 0.85 * 1./3.,
 				FaceMask.N95, 0.85 * 1./3.,
 				FaceMask.SURGICAL, 0.85 * 1./3.)),
-				"pt", "shop_daily", "shop_other", "errands");
+			"pt", "shop_daily", "shop_other", "errands");
 		restrictions.restrict(LocalDate.parse("2020-08-01"), Restriction.ofMask(Map.of(
 				FaceMask.CLOTH, 0.9 * 1./3.,
 				FaceMask.N95, 0.9 * 1./3.,
 				FaceMask.SURGICAL, 0.9 * 1./3.)),
-				"pt", "shop_daily", "shop_other", "errands");
+			"pt", "shop_daily", "shop_other", "errands");
 
 		//Pflicht für medizinische Masken: https://www.rbb24.de/politik/thema/corona/beitraege/2021/01/verschaerfte-maskenpflicht-berlin-ffp2-oepnv-.html
 		restrictions.restrict(LocalDate.parse("2021-01-24"), Restriction.ofMask(Map.of(
 				FaceMask.N95, 0.9 * 1./2.,
 				FaceMask.SURGICAL, 0.9 * 1./2.)),
-				"pt", "shop_daily", "shop_other", "errands");
+			"pt", "shop_daily", "shop_other", "errands");
 
 		//FFP2-Maskenpflicht 2021: https://www.berlin.de/aktuelles/berlin/6489489-958092-ab-mittwoch-an-vielen-orten-ffp2masken-p.html
 		restrictions.restrict(LocalDate.parse("2021-03-31"), Restriction.ofMask(Map.of(
 				FaceMask.N95, 0.9)),
-				"pt", "shop_daily", "shop_other", "errands");
+			"pt", "shop_daily", "shop_other", "errands");
 
 		//Maskenpflicht Lockerung: medizinische Masken im Einzelhandel: https://www.berlin.de/rbmskzl/aktuelles/pressemitteilungen/2021/pressemitteilung.1103648.php
 		restrictions.restrict(LocalDate.parse("2021-07-10"), Restriction.ofMask(Map.of(
 				FaceMask.N95, 0.9 * 1./2.,
 				FaceMask.SURGICAL, 0.9 * 1./2.)),
-				"shop_daily", "shop_other", "errands");
+			"shop_daily", "shop_other", "errands");
 
 		//FFP2-Pflicht Lockerung im ÖPNV mit der Einführung der 3G Regelung: https://gesetze.berlin.de/bsbe/document/jlr-CoronaV4VBEV4P2
 		restrictions.restrict(LocalDate.parse("2021-12-18"), Restriction.ofMask(Map.of(
 				FaceMask.N95, 0.9 * 1./2.,
 				FaceMask.SURGICAL, 0.9 * 1./2.)),
-				"pt");
+			"pt");
 
 		//FFP2-Maskenpflicht in public transit (2022): https://www.berlin.de/aktuelles/7240429-958090-senat-beschliesst-ffp2maskenpflicht-im-o.html
 		restrictions.restrict(LocalDate.parse("2022-01-15"), Restriction.ofMask(Map.of(
 				FaceMask.N95, 0.9)),
-				"pt");
+			"pt");
 
 		//FFP2-Maskenpflicht in pt and businesses (2022) TODO: coming soon:https://www.berlin.de/aktuelles/7299635-958090-ffp2maskenpflicht-statt-2gregel-im-einze.html
 //		restrictions.restrict(LocalDate.parse("2021-03-31"), Restriction.ofMask(Map.of(
@@ -223,7 +223,7 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 				FaceMask.CLOTH, 0.9 * 1./3.,
 				FaceMask.N95, 0.9 * 1./3.,
 				FaceMask.SURGICAL, 0.9 * 1./3.)),
-				"educ_higher", "educ_tertiary", "educ_other");
+			"educ_higher", "educ_tertiary", "educ_other");
 
 		if (activityParticipation instanceof CreateAdjustedRestrictionsFromCSV) {
 			CreateAdjustedRestrictionsFromCSV adjusted = (CreateAdjustedRestrictionsFromCSV) activityParticipation;
@@ -232,18 +232,134 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 			adjusted.setPolicy(restrictions);
 			LocalDate[] restaurantPeriod = new LocalDate[] {LocalDate.parse("2020-03-22"), LocalDate.parse("2020-05-14"), LocalDate.parse("2020-11-02"), LocalDate.MAX};
 			adjusted.setAdministrativePeriods(Map.of(
-					"educ_primary", period,
-					"educ_secondary", period,
-					"educ_tertiary", period,
-					"educ_other", period,
-					"educ_kiga" , period,
-					"restaurant", restaurantPeriod
+				"educ_primary", period,
+				"educ_secondary", period,
+				"educ_tertiary", period,
+				"educ_other", period,
+				"educ_kiga" , period,
+				"restaurant", restaurantPeriod
 			));
 
 			return activityParticipation.createPolicy();
 		}
 
 		return restrictions;
+	}
+
+	private static ShutdownPolicy.ConfigBuilder<?> basePolicyBrandenburg(RestrictionInput activityParticipation, Map<String, Double> ciCorrections,
+																		 long introductionPeriod, Double maskCompliance, boolean restrictSchoolsAndDayCare,
+																		 boolean restrictUniversities) throws IOException {
+
+		if(!restrictUniversities || !restrictSchoolsAndDayCare) {
+			throw new RuntimeException("Brandenburg scenario currently restricts schools, daycare, and universities. Not currently configurable");
+		}
+
+		// note that there is already a builder around this
+		ConfigBuilder builder;
+		if (activityParticipation == null || activityParticipation instanceof CreateAdjustedRestrictionsFromCSV) {
+			throw new RuntimeException("Adjusted Restrictions not supported in Brandenburg");
+		} else {
+			builder = (ConfigBuilder) activityParticipation.createPolicy();
+		}
+
+
+		// school vacations & lockdowns.
+		// https://www.maz-online.de/brandenburg/corona-krise-in-brandenburg-eine-chronologie-SIFYHOEII3ZG6G5XW4HULSD4GI.html
+		//
+		// https://brandenburg.de/cms/detail.php/detail.php?gsid=bb1.c.663534.de
+		//
+		//	https://brandenburg.de/cms/detail.php/bb1.c.691163.de
+//		 "Das Kabinett beschließt die Schließung von Schulen und Kitas ab 18. März"
+		builder.restrict(LocalDate.parse("2020-03-18"), 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other", "educ_higher");
+		// 17. April 2020: Das Kabinett beschließt erste Lockerungen:[...], eingesetzt erst am 27. Nur Abschlussklassen  Auch die Schulen starten nach einem Stufenplan wieder den Unterricht.
+		builder.restrict(LocalDate.parse("2020-04-27"), 0.3, "educ_secondary", "educ_tertiary", "educ_other");
+		// 6th grade goes back
+		builder.restrict(LocalDate.parse("2020-05-04"), 0.3, "educ_primary");
+		// 9th and 12th grade of secondary school, and 11th grade of gymnasium
+		builder.restrict(LocalDate.parse("2020-05-04"), 0.4, "educ_secondary", "educ_tertiary", "educ_other");
+		builder.restrict(LocalDate.parse("2020-05-25"), 1.0, "educ_kiga", "educ_primary",  "educ_secondary", "educ_tertiary", "educ_other");
+		//Sommerferien (Source = https://www.payback.de/ratgeber/besser-leben/reisen/ferien-2020#Brandenburg)
+		builder.restrict(LocalDate.parse("2020-06-25"), 0.2,  "educ_kiga", "educ_primary","educ_secondary", "educ_tertiary", "educ_other");
+		//10. August 2020: Die Schulen starten nach den Sommerferien wieder in den Regelbetrieb.
+		builder.restrict(LocalDate.parse("2020-08-10"), 1.0,  "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		//Lueften nach den Sommerferien
+		builder.restrict(LocalDate.parse("2020-08-10"), Restriction.ofCiCorrection(0.5), "educ_primary", "educ_kiga", "educ_secondary", "educ_tertiary", "educ_other");
+		builder.restrict(LocalDate.parse("2020-12-31"), Restriction.ofCiCorrection(1.0), "educ_primary", "educ_kiga", "educ_secondary", "educ_tertiary", "educ_other");
+		//Herbstferien
+		builder.restrict(LocalDate.parse("2020-10-12"), 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		builder.restrict(LocalDate.parse("2020-10-24"), 1.0, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		//14. Dezember 2020: Die Präsenzpflicht in den Schulen wird eine Woche vor den Weihnachtsferien aufgehoben.
+		builder.restrict(LocalDate.parse("2020-12-14"), 0.5, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		//Weihnachtsferien (which morph into school closure)
+		builder.restrict(LocalDate.parse("2020-12-21"), 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		// Abschlussklassen und Förderschulen wieder unterichtet.
+		builder.restrict(LocalDate.parse("2021-01-21"), 0.3, "educ_secondary", "educ_tertiary", "educ_other");
+		//22. Februar 2021: Die Grundschulen öffnen wieder im Wechselunterricht zwischen Schule und zuhause.
+		builder.restrict(LocalDate.parse("2021-02-22"), 0.5, "educ_primary");
+		builder.restrict(LocalDate.parse("2021-03-15"), 1.0, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		//Osterferien
+		builder.restrict(LocalDate.parse("2021-03-29"), 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		builder.restrict(LocalDate.parse("2021-04-10"), 1.0, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		//Sommerferien
+		builder.restrict(LocalDate.parse("2021-06-24"), 0.2, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		builder.restrict(LocalDate.parse("2021-08-08"), 1.0, "educ_kiga", "educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+
+
+		{
+			// Part 1: pt, shopping, errands
+
+			LocalDate masksCenterDate = LocalDate.of(2020, 4, 27);
+			for (int ii = 0; ii <= 14; ii++) {
+				LocalDate date = masksCenterDate.plusDays(-14 / 2 + ii);
+				// assume 90% compliance, divided btwn 3 mask types.
+				double clothFraction = 1. / 3. * 0.9;
+				double ffpFraction = 1. / 3. * 0.9;
+				double surgicalFraction = 1. / 3. * 0.9;
+
+				builder.restrict(date, Restriction.ofMask(Map.of(
+						FaceMask.CLOTH, clothFraction * ii / 14,
+						FaceMask.N95, ffpFraction * ii / 14,
+						FaceMask.SURGICAL, surgicalFraction * ii / 14)),
+					"pt", "shop_daily", "shop_other", "errands");
+			}
+
+
+			// cloth mask no longer allowed
+			//https://brandenburg.de/cms/detail.php/detail.php?gsid=bb1.c.664579.de
+			//https://brandenburg.de/cms/detail.php/detail.php?gsid=bb1.c.693535.de
+			builder.restrict(LocalDate.of(2021, 1, 23), Restriction.ofMask(Map.of(
+					FaceMask.CLOTH, 0.,
+					FaceMask.N95, 1. / 2. * 0.9,
+					FaceMask.SURGICAL, 1. / 2. * 0.9)),
+				"pt", "shop_daily", "shop_other", "errands");
+
+
+			// Part 2: School
+			// skipped the mask recommendations/mandates for spaces within school but not within classrooms
+			//https://mbjs.brandenburg.de/aktuelles/pressemitteilungen.html?news=bb1.c.684838.de
+			//
+			//https://bravors.brandenburg.de/verordnungen/sars_cov_2_eindv_30_10_2020#17
+			//
+			//https://bravors.brandenburg.de/verordnungen/2__sars_cov_2_eindv_30_11_2020#17
+			//
+			//https://bravors.brandenburg.de/verordnungen/5__sars_cov_2_eindv_22_01_2021
+			builder.restrict(LocalDate.parse("2020-11-02"), Restriction.ofMask(Map.of(
+				FaceMask.CLOTH, 1./3. * 0.9,
+				FaceMask.N95, 1. / 3. * 0.9,
+				FaceMask.SURGICAL, 1. / 3. * 0.9)), "educ_tertiary");
+			builder.restrict(LocalDate.parse("2020-12-01"), Restriction.ofMask(Map.of(
+				FaceMask.CLOTH, 1./3. * 0.9,
+				FaceMask.N95, 1. / 3. * 0.9,
+				FaceMask.SURGICAL, 1. / 3. * 0.9)), "educ_secondary");
+			builder.restrict(LocalDate.parse("2021-01-23"), Restriction.ofMask(Map.of(
+					FaceMask.CLOTH, 0.,
+					FaceMask.N95, 1. / 2. * 0.9,
+					FaceMask.SURGICAL, 1. / 2. * 0.9)),
+				"educ_primary", "educ_secondary", "educ_tertiary", "educ_other");
+		}
+
+
+		return builder;
 	}
 
 	@Provides
@@ -281,7 +397,7 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 		tracingConfig.setEquipmentRate(1.);
 		tracingConfig.setTracingDelay_days(2);
 		tracingConfig.setTracingCapacity_pers_per_day(Map.of(
-				LocalDate.of(2020, 4, 1), 30
+			LocalDate.of(2020, 4, 1), 30
 		));
 
 		BasePolicyBuilder basePolicyBuilder = new BasePolicyBuilder(episimConfig);
@@ -364,7 +480,18 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 			ConfigBuilder configBuilder;
 			try {
 				configBuilder = (ConfigBuilder) basePolicy(activityParticipation, ciCorrections,introductionPeriod,
-						maskCompliance, restrictSchoolsAndDayCare, restrictUniversities);
+					maskCompliance, restrictSchoolsAndDayCare, restrictUniversities);
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			}
+			return configBuilder;
+		}
+
+		public ConfigBuilder buildFixedBrandenburg() {
+			ConfigBuilder configBuilder;
+			try {
+				configBuilder = (ConfigBuilder) basePolicyBrandenburg(activityParticipation, ciCorrections,introductionPeriod,
+					maskCompliance, restrictSchoolsAndDayCare, restrictUniversities);
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
@@ -375,7 +502,7 @@ public final class SnzBerlinScenario25pct2020 extends AbstractSnzScenario2020 {
 			ShutdownPolicy.ConfigBuilder<?> configBuilder;
 			try {
 				configBuilder = basePolicy(activityParticipation, ciCorrections,introductionPeriod,
-						maskCompliance, restrictSchoolsAndDayCare, restrictUniversities);
+					maskCompliance, restrictSchoolsAndDayCare, restrictUniversities);
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
