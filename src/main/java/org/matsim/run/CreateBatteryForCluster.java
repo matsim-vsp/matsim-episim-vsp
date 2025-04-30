@@ -60,14 +60,18 @@ import java.util.stream.Collectors;
  * @param <T> type to match run and params
  */
 @CommandLine.Command(
-		name = "createBattery",
-		description = "Create batch scripts for execution on computing cluster.",
-		mixinStandardHelpOptions = true
+	name = "createBattery",
+	description = "Create batch scripts for execution on computing cluster.",
+	mixinStandardHelpOptions = true
 )
 @SuppressWarnings("unchecked, rawtypes")
 public class CreateBatteryForCluster<T> implements Callable<Integer> {
+	private static final String CLASS_NAME = "newA_berlin";
+//	private static final String CLASS_NAME = "newB_brand";
+//	private static final String CLASS_NAME = "newC_berlin_brand";
 
 	private static final Logger log = LogManager.getLogger(CreateBatteryForCluster.class);
+
 
 	@CommandLine.Option(names = "--output", defaultValue = "battery")
 	private Path output;
@@ -84,10 +88,10 @@ public class CreateBatteryForCluster<T> implements Callable<Integer> {
 	@CommandLine.Option(names = "--jvm-opts", description = "Additional options for JVM", defaultValue = "-Xms82G -Xmx82G -XX:+UseParallelGC")
 	private String jvmOpts;
 
-	@CommandLine.Option(names = "--setup", defaultValue = "org.matsim.run.batch.StarterBatchCologne")
+	@CommandLine.Option(names = "--setup", defaultValue = "org.matsim.run.batch." + CLASS_NAME)
 	private Class<? extends BatchRun<T>> setup;
 
-	@CommandLine.Option(names = "--params", defaultValue = "org.matsim.run.batch.StarterBatchCologne$Params")
+	@CommandLine.Option(names = "--params", defaultValue = "org.matsim.run.batch."+ CLASS_NAME + "$Params")
 	private Class<T> params;
 
 	@SuppressWarnings("rawtypes")
@@ -152,8 +156,8 @@ public class CreateBatteryForCluster<T> implements Callable<Integer> {
 			int arrayEnd = (int) Math.ceil((double) Math.min(offset + step, prepare.runs.size() - offset) / stepSize) * stepSize;
 
 			lines.add(
-					String.format("sbatch --export=JAVA_OPTS,EXTRA_OFFSET=%d --array=0-%d:%d --ntasks-per-node=%d --job-name=%s runSlurm.sh",
-							offset, arrayEnd - 1, stepSize, stepSize, runName)
+				String.format("sbatch --export=JAVA_OPTS,EXTRA_OFFSET=%d --array=0-%d:%d --ntasks-per-node=%d --job-name=%s runSlurm.sh",
+					offset, arrayEnd - 1, stepSize, stepSize, runName)
 			);
 		}
 
@@ -164,36 +168,36 @@ public class CreateBatteryForCluster<T> implements Callable<Integer> {
 		int perSocket = (stepSize / 4);
 
 		FileUtils.writeLines(dir.resolve("start_parallel_slurm.sh").toFile(), Lists.newArrayList(
-				"#!/bin/bash\n", jvmOpts,
-				// Dollar signs must be escaped
-				"export EPISIM_SETUP='" + setup.getName() + "'",
-				"export EPISIM_PARAMS='" + params.getName() + "'",
-				"export EPISIM_INPUT='/scratch/projects/bzz0020/episim-input'",
-				"export EPISIM_OUTPUT='" + batchOutput.toString() + "'",
-				"",
-				String.format("jid=$(sbatch --parsable --export=ALL --array=1-%d --ntasks-per-socket=%d --job-name=%s runParallel.sh)",
-						(int) Math.ceil(prepare.runs.size() / (perSocket * 4d)), perSocket, runName),
-				"sbatch --export=ALL --dependency=afterok:$jid postProcess.sh"
+			"#!/bin/bash\n", jvmOpts,
+			// Dollar signs must be escaped
+			"export EPISIM_SETUP='" + setup.getName() + "'",
+			"export EPISIM_PARAMS='" + params.getName() + "'",
+			"export EPISIM_INPUT='/scratch/projects/bzz0020/episim-input'",
+			"export EPISIM_OUTPUT='" + batchOutput.toString() + "'",
+			"",
+			String.format("jid=$(sbatch --parsable --export=ALL --array=1-%d --ntasks-per-socket=%d --job-name=%s runParallel.sh)",
+				(int) Math.ceil(prepare.runs.size() / (perSocket * 4d)), perSocket, runName),
+			"sbatch --export=ALL --dependency=afterok:$jid postProcess.sh"
 		), "\n");
 
 		FileUtils.writeLines(dir.resolve("start_qsub.sh").toFile(), Lists.newArrayList(
-				"#!/bin/bash\n", jvmOpts,
-				// Dollar signs must be escaped
-				"export EPISIM_SETUP='" + setup.getName() + "'",
-				"export EPISIM_PARAMS='" + params.getName() + "'",
-				"export EPISIM_INPUT='<PUT INPUT DIR HERE>'",
-				"export EPISIM_OUTPUT='" + batchOutput.toString() + "'",
-				"",
-				String.format("jid=$(qsub -V -N %s run.sh)", runName),
-				"qsub -V -W depend=afterok:$jid postProcess.sh"
+			"#!/bin/bash\n", jvmOpts,
+			// Dollar signs must be escaped
+			"export EPISIM_SETUP='" + setup.getName() + "'",
+			"export EPISIM_PARAMS='" + params.getName() + "'",
+			"export EPISIM_INPUT='<PUT INPUT DIR HERE>'",
+			"export EPISIM_OUTPUT='" + batchOutput.toString() + "'",
+			"",
+			String.format("jid=$(qsub -V -N %s run.sh)", runName),
+			"qsub -V -W depend=afterok:$jid postProcess.sh"
 		), "\n");
 
 
 		FileUtils.writeLines(dir.resolve("test.sh").toFile(), Lists.newArrayList(
-				"#!/bin/bash\n", jvmOpts,
-				"export JOB_NAME=" + runName + 1,
-				"",
-				"./run.sh"
+			"#!/bin/bash\n", jvmOpts,
+			"export JOB_NAME=" + runName + 1,
+			"",
+			"./run.sh"
 		), "\n");
 
 		infoWriter.close();
@@ -251,9 +255,9 @@ public class CreateBatteryForCluster<T> implements Callable<Integer> {
 		BufferedWriter yamlWriter = Files.newBufferedWriter(dir.resolve("metadata.yaml"));
 
 		ObjectMapper mapper = new ObjectMapper(new YAMLFactory()
-				.enable(YAMLGenerator.Feature.MINIMIZE_QUOTES))
-				.registerModule(new JavaTimeModule())
-				.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+			.enable(YAMLGenerator.Feature.MINIMIZE_QUOTES))
+			.registerModule(new JavaTimeModule())
+			.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
 		Map<String, Object> metadata = new LinkedHashMap<>();
 
