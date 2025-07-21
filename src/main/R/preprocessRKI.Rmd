@@ -1,0 +1,109 @@
+---
+title: "preprocess_RKI_data"
+author: "Inan Bostanci"
+date: "2025-07-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# import necessary libraries
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(tidyr)
+```
+
+## RKI data on reported cases
+
+
+```{r}
+# Load data
+may21 <- read_csv('/Users/inanb/Documents/GitHub/berlin_ode/2021-05-31_Deutschland_SarsCov2_Infektionen.csv')
+
+# Filter for Berlin (IdLandkreis starts with "11")
+berlin <- may21 %>%
+  filter(startsWith(as.character(IdLandkreis), "11"))
+
+# Group by date and sum over age groups
+berlin_grouped <- berlin %>%
+  group_by(Refdatum) %>%
+  summarise(AnzahlFall = sum(AnzahlFall, na.rm = TRUE)) %>%
+  mutate(Refdatum = as_date(Refdatum))
+```
+
+```{r}
+# Create daily new cases dataframe
+be <- berlin_grouped %>%
+  rename(date = Refdatum, daily_new = AnzahlFall)
+
+# Create complete date range and reindex, filling missing dates with 0
+full_dates <- tibble(date = seq(min(be$date), max(be$date), by = "day"))
+
+be <- full_dates %>%
+  left_join(be, by = "date") %>%
+  mutate(daily_new = replace_na(daily_new, 0))
+```
+
+```{r}
+# Calculate active cases as current + previous 2 days
+be <- be %>%
+  mutate(active_cases = lead(daily_new, 2, default = 0) +
+                       lead(daily_new, 1, default = 0) +
+                       daily_new)
+
+# Calculate cumulative and recovered
+be <- be %>%
+  mutate(cumulative_cases = cumsum(daily_new),
+         recovered = lag(cumulative_cases, default = 0),
+         susceptible = 3782202 - cumulative_cases)
+```
+
+```{r}
+# First, gather the data to long format for plotting
+plot_data <- be %>%
+  select(date, daily_new, active_cases) %>%
+  pivot_longer(cols = c(daily_new, active_cases),
+               names_to = "type", values_to = "count")
+
+# Plot
+ggplot(plot_data, aes(x = date, y = count, color = type)) +
+  geom_line(size = 1) +
+  labs(title = "Daily New Cases and Active Cases in Berlin",
+       x = "Date",
+       y = "Number of Cases",
+       color = "Type") +
+  theme_minimal()
+
+```
+
+
+
+```{r}
+# Normalize and build final berlin_data frame
+berlin_data <- be %>%
+  mutate(susceptible = susceptible / 3782202,
+         infected = active_cases / 3782202,
+         recovered = recovered / 3782202) %>%
+  mutate(exposed = 0,
+         symptomatic = 0,
+         hospitalized = 0,
+         critical = 0,
+         deceased = 0,
+         quarantine_S = 0,
+         quarantine_E = 0,
+         quarantine_I = 0,
+         contact_traced = 0) %>%
+  select(date, susceptible, exposed, infected, recovered, symptomatic,
+         hospitalized, critical, deceased, quarantine_S, quarantine_E,
+         quarantine_I, contact_traced) %>%
+  arrange(date)
+```
+
+```{r}
+# Save to CSV
+# write_csv(berlin_data, "/Users/inanb/Documents/ZIB/ode_berlin_2502/data.csv")
+```
+
