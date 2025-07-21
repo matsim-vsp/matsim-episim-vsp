@@ -13,57 +13,46 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 library(lubridate)
-library(tidyr)
+library(tidyverse)
+library(zoo)
 ```
 
 ## RKI data on reported cases
+RKI provides the daily number of new confirmed COVID-19 cases in Germany, available at the county level (IdLandkreis, starts with "11" for Berlin, "12" for Brandenburg), broken down by age group and gender. The data can be differentiated into "Meldedatum", which is the date of reporting, and "Refdatum", which is either the assumed date of the actual onset, or if unknown, the date of reporting. 
 
+The data is available in CSV format and can be downloaded from https://github.com/robert-koch-institut/SARS-CoV-2-Infektionen_in_Deutschland_Archiv
+
+For the ODE fit, it seems that we used "Refdatum", which is the date of the actual onset or reporting date, and not "Meldedatum", which is the date of reporting. However, for the ABM, I think we used "Meldedatum" - this might make sense if the ABM enables to simulate the reporting process, while the ODE's I-compartment simulates the actual disease progression.
 
 ```{r}
-# Load data
-may21 <- read_csv('/Users/inanb/Documents/GitHub/berlin_ode/2021-05-31_Deutschland_SarsCov2_Infektionen.csv')
-
-# Filter for Berlin (IdLandkreis starts with "11")
-berlin <- may21 %>%
-  filter(startsWith(as.character(IdLandkreis), "11"))
-
-# Group by date and sum over age groups
-berlin_grouped <- berlin %>%
-  group_by(Refdatum) %>%
-  summarise(AnzahlFall = sum(AnzahlFall, na.rm = TRUE)) %>%
-  mutate(Refdatum = as_date(Refdatum))
+# Helper function to process and aggregate RKI data
+process_rki_data <- function(df, date_col, region_prefix = "11") {
+  df %>%
+    filter(str_starts(as.character(IdLandkreis), region_prefix)) %>%
+    group_by(date = as_date(.data[[date_col]])) %>%
+    summarise(daily_new = sum(AnzahlFall, na.rm = TRUE), .groups = "drop") %>%
+    complete(date = seq(min(date), max(date), by = "1 day"), fill = list(daily_new = 0)) %>%
+    arrange(date) %>%
+    mutate(
+      active_cases = daily_new + lead(daily_new, 1, default = 0) + lead(daily_new, 2, default = 0),
+      cumulative_cases = cumsum(daily_new),
+      recovered = lag(cumulative_cases, default = 0),
+      susceptible = 3782202 - cumulative_cases
+    )
+}
 ```
 
 ```{r}
-# Create daily new cases dataframe
-be <- berlin_grouped %>%
-  rename(date = Refdatum, daily_new = AnzahlFall)
-
-# Create complete date range and reindex, filling missing dates with 0
-full_dates <- tibble(date = seq(min(be$date), max(be$date), by = "day"))
-
-be <- full_dates %>%
-  left_join(be, by = "date") %>%
-  mutate(daily_new = replace_na(daily_new, 0))
+# Load data and process both Refdatum and Meldedatum
+raw_data <- read_csv('/Users/inanb/Documents/GitHub/berlin_ode/2021-05-31_Deutschland_SarsCov2_Infektionen.csv')
+berlin_ref <- process_rki_data(raw_data, "Refdatum")
+berlin_melde <- process_rki_data(raw_data, "Meldedatum")
 ```
 
-```{r}
-# Calculate active cases as current + previous 2 days
-be <- be %>%
-  mutate(active_cases = lead(daily_new, 2, default = 0) +
-                       lead(daily_new, 1, default = 0) +
-                       daily_new)
-
-# Calculate cumulative and recovered
-be <- be %>%
-  mutate(cumulative_cases = cumsum(daily_new),
-         recovered = lag(cumulative_cases, default = 0),
-         susceptible = 3782202 - cumulative_cases)
-```
 
 ```{r}
 # First, gather the data to long format for plotting
-plot_data <- be %>%
+plot_data <- berlin_ref %>%
   select(date, daily_new, active_cases) %>%
   pivot_longer(cols = c(daily_new, active_cases),
                names_to = "type", values_to = "count")
@@ -80,10 +69,49 @@ ggplot(plot_data, aes(x = date, y = count, color = type)) +
 ```
 
 
+Lets compare the curves for Meldedatum and Refdatum
 
 ```{r}
+# merge be_ref and be_melde for comparison
+berlin_combined <- berlin_ref %>%
+  select(date, daily_new_ref = daily_new, active_cases_ref = active_cases) %>%
+  left_join(
+    berlin_melde %>%
+      select(date, daily_new_melde = daily_new, active_cases_melde = active_cases),
+    by = "date"
+  )
+
+period_filter <- between(berlin_combined$date, as.Date("2020-03-02"), as.Date("2020-05-31"))
+
+ggplot(filter(berlin_combined, period_filter), aes(x = date)) +
+  geom_line(aes(y = daily_new_ref, color = "Refdatum")) +
+  geom_line(aes(y = daily_new_melde, color = "Meldedatum")) +
+  labs(title = "Comparison of Daily New Cases", x = "Date", y = "Daily Cases", color = "Date Type") +
+  theme_minimal()
+
+
+```
+```{r}
+# smooth the curves with rolling 7 day incidence per 100.000
+incidence_data <- berlin_combined %>%
+  mutate(
+    incidence_ref = rollmean(daily_new_ref, 7, fill = NA, align = "right") / 3782202 * 1e5,
+    incidence_melde = rollmean(daily_new_melde, 7, fill = NA, align = "right") / 3782202 * 1e5
+  )
+
+ggplot(filter(incidence_data, period_filter), aes(x = date)) +
+  geom_line(aes(y = incidence_ref, color = "Refdatum")) +
+  geom_line(aes(y = incidence_melde, color = "Meldedatum")) +
+  labs(title = "7-Day Incidence per 100k (Berlin)", x = "Date", y = "Incidence", color = "Date Type") +
+  theme_minimal()
+
+```
+The curve for Meldedatum has a delayed peak, while the curve for Refdatum has a peak around mid-March 2020. The Refdatum curve is more representative of the actual disease progression, while the Meldedatum curve reflects the reporting process, which can introduce delays. 
+
+```{r}
+
 # Normalize and build final berlin_data frame
-berlin_data <- be %>%
+berlin_data <- be_ref %>%
   mutate(susceptible = susceptible / 3782202,
          infected = active_cases / 3782202,
          recovered = recovered / 3782202) %>%
@@ -100,9 +128,6 @@ berlin_data <- be %>%
          hospitalized, critical, deceased, quarantine_S, quarantine_E,
          quarantine_I, contact_traced) %>%
   arrange(date)
-```
-
-```{r}
 # Save to CSV
 # write_csv(berlin_data, "/Users/inanb/Documents/ZIB/ode_berlin_2502/data.csv")
 ```
