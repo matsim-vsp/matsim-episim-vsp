@@ -42,9 +42,24 @@ process_rki_data <- function(df, date_col, region_prefix = "11") {
 }
 ```
 
+Load data from Github
+```{r}
+# Load data from the RKI GitHub repository
+library(readr)
+rki_repo_url <- "https://github.com/robert-koch-institut/SARS-CoV-2-Infektionen_in_Deutschland_Archiv/raw/refs/heads/main/Archiv/2021-05-31_Deutschland_SarsCov2_Infektionen.csv.xz"
+
+# Download to a temp file
+tmpfile <- tempfile(fileext = ".csv.xz")
+download.file(rki_repo_url, tmpfile, mode = "wb")
+
+# Read from compressed file directly
+raw_data <- read_csv(tmpfile)
+```
+
+
 ```{r}
 # Load data and process both Refdatum and Meldedatum
-raw_data <- read_csv('/Users/inanb/Documents/GitHub/berlin_ode/2021-05-31_Deutschland_SarsCov2_Infektionen.csv')
+# raw_data <- read_csv('/Users/inanb/Documents/GitHub/berlin_ode/2021-05-31_Deutschland_SarsCov2_Infektionen.csv')
 berlin_ref <- process_rki_data(raw_data, "Refdatum")
 berlin_melde <- process_rki_data(raw_data, "Meldedatum")
 ```
