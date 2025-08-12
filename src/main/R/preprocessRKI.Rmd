@@ -108,13 +108,13 @@ ggplot(filter(berlin_combined, period_filter), aes(x = date)) +
 ```
 ```{r}
 # smooth the curves with rolling 7 day incidence per 100.000
-incidence_data <- berlin_combined %>%
+incidence_data_be <- berlin_combined %>%
   mutate(
     incidence_ref = rollmean(daily_new_ref, 7, fill = NA, align = "right") / 3782202 * 1e5,
     incidence_melde = rollmean(daily_new_melde, 7, fill = NA, align = "right") / 3782202 * 1e5
   )
 
-ggplot(filter(incidence_data, period_filter), aes(x = date)) +
+ggplot(filter(incidence_data_be, period_filter), aes(x = date)) +
   geom_line(aes(y = incidence_ref, color = "Refdatum")) +
   geom_line(aes(y = incidence_melde, color = "Meldedatum")) +
   labs(title = "7-Day Incidence per 100k (Berlin)", x = "Date", y = "Incidence", color = "Date Type") +
@@ -126,7 +126,7 @@ The curve for Meldedatum has a delayed peak, while the curve for Refdatum has a 
 ```{r}
 
 # Normalize and build final berlin_data frame
-berlin_data <- be_ref %>%
+berlin_data <- berlin_ref %>%
   mutate(susceptible = susceptible / 3782202,
          infected = active_cases / 3782202,
          recovered = recovered / 3782202) %>%
@@ -207,7 +207,7 @@ ggplot(filter(incidence_data_br, period_filter), aes(x = date)) +
 
 Now, combined incidence in Berlin and Brandenburg
 ```{r}
-combined_data <- berlin_combined %>%
+bebr_combined <- berlin_combined %>%
   select(date, daily_new_ref, daily_new_melde) %>%
   rename(daily_new_berlin_ref = daily_new_ref, daily_new_berlin_melde = daily_new_melde) %>%
   left_join(
@@ -218,15 +218,15 @@ combined_data <- berlin_combined %>%
   )
 
 # sum the daily new cases for both regions
-combined_data <- combined_data %>%
+bebr_combined <- bebr_combined %>%
   mutate(
     daily_new_ref = daily_new_berlin_ref + daily_new_brandenburg_ref,
     daily_new_melde = daily_new_berlin_melde + daily_new_brandenburg_melde
   )
 
-period_filter <- between(combined_data$date, as.Date("2020-03-02"), as.Date("2020-05-31"))
+period_filter <- between(bebr_combined$date, as.Date("2020-03-02"), as.Date("2020-05-31"))
 
-ggplot(filter(combined_data, period_filter), aes(x = date)) +
+ggplot(filter(bebr_combined, period_filter), aes(x = date)) +
   geom_line(aes(y = daily_new_ref, color = "Refdatum")) +
   geom_line(aes(y = daily_new_melde, color = "Meldedatum")) +
   labs(title = "Comparison of Daily New Cases (Berlin + Brandenburg)", x = "Date", y = "Daily Cases", color = "Date Type") +
@@ -236,7 +236,7 @@ ggplot(filter(combined_data, period_filter), aes(x = date)) +
 Incidence
 ```{r}
 # smooth the curves with rolling 7 day incidence per 100.000
-incidence_data_bebr <- combined_data %>%
+incidence_data_bebr <- bebr_combined %>%
   mutate(
     incidence_ref = rollmean(daily_new_ref, 7, fill = NA, align = "right") / (2556747 + 3782202) * 1e5,
     incidence_melde = rollmean(daily_new_melde, 7, fill = NA, align = "right") / (2556747 + 3782202) * 1e5
