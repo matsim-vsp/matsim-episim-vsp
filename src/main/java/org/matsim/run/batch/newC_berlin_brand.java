@@ -84,12 +84,16 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 			episimConfig.setInitialInfectionDistrict("Berlin");
 		}
 
-		if (params.importMult != 1.0) {
-			for (NavigableMap<LocalDate, Integer> dateToImportMap : episimConfig.getInfections_pers_per_day().values()) {
+		for (NavigableMap<LocalDate, Integer> dateToImportMap : episimConfig.getInfections_pers_per_day().values()) {
 
-				dateToImportMap.replaceAll((k, v) -> (int) (v * params.importMult));
-
+			for(LocalDate date : dateToImportMap.keySet()) {
+				if (date.isBefore(LocalDate.of(2020, 5, 1))) {
+					dateToImportMap.put(date, (int) (dateToImportMap.get(date) * params.importMultSpring));
+				} else {
+					dateToImportMap.put(date, (int) (dateToImportMap.get(date) * params.importMultSummer));
+				}
 			}
+
 		}
 
 		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * params.thetaFactor);
@@ -106,15 +110,22 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 		@GenerateSeeds(5)
 		public long seed;
 
-		@Parameter({0.5, 0.7, 0.8, 0.9, 1.0})
+		@Parameter({0.6, 0.7, 0.8, 0.9, 1.0})
+//		@Parameter({1.0})
 		public double thetaFactor;
 
 
-		@StringParameter({"true","false"})
+		@StringParameter({"true" ,"false"})
+//		@StringParameter({"true"})
 		public String importToBerlin;
 
-		@Parameter({0.1, 0.25, 0.5, 0.75, 1.0})
-		public double importMult;
+		@Parameter({0.01, 0.1, 0.5, 1.0, 1.65})
+		public double importMultSpring;
+
+		@Parameter({0.01, 0.1, 0.5, 1.0, 1.65})
+		public double importMultSummer;
+
+
 
 	}
 

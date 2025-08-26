@@ -6,7 +6,7 @@
     <artifactId>matsim-episim-vsp</artifactId>
     <version>2025.1</version>
 
-    <name>MATSim Episim Scenarios</name>
+    <name>MATSim Episim VSP</name>
     <description>Epidemic simulation for MATSim</description>
     <organization>
         <name>matsim-org</name>

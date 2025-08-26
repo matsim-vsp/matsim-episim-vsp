@@ -66,9 +66,9 @@ import java.util.stream.Collectors;
 )
 @SuppressWarnings("unchecked, rawtypes")
 public class CreateBatteryForCluster<T> implements Callable<Integer> {
-	private static final String CLASS_NAME = "newA_berlin";
+//	private static final String CLASS_NAME = "newA_berlin";
 //	private static final String CLASS_NAME = "newB_brand";
-//	private static final String CLASS_NAME = "newC_berlin_brand";
+	private static final String CLASS_NAME = "newC_berlin_brand";
 
 	private static final Logger log = LogManager.getLogger(CreateBatteryForCluster.class);
 
@@ -82,7 +82,7 @@ public class CreateBatteryForCluster<T> implements Callable<Integer> {
 	@CommandLine.Option(names = "--run-version", description = "Run version", defaultValue = "v16")
 	private String runVersion;
 
-	@CommandLine.Option(names = "--step-size", description = "Step size of the job array", defaultValue = "32")
+	@CommandLine.Option(names = "--step-size", description = "Step size of the job array", defaultValue = "8") // original = 32
 	private int stepSize;
 
 	@CommandLine.Option(names = "--jvm-opts", description = "Additional options for JVM", defaultValue = "-Xms82G -Xmx82G -XX:+UseParallelGC")

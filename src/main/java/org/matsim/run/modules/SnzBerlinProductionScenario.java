@@ -319,6 +319,8 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 				importFactorAfterJune
 			);
 
+
+
 		} else {
 			episimConfig.setInitialInfectionDistrict("Berlin"); // todo: what if we do a brandenburg sc
 			episimConfig.setCalibrationParameter(2.54e-5);
