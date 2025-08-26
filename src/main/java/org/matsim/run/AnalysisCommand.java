@@ -50,17 +50,18 @@ import java.util.zip.GZIPInputStream;
  * Runnable class that does nothing by itself, but has to be invoked with one subcommand.
  */
 @CommandLine.Command(
-		name = "analysis",
-		description = "Analysis tool for Episim offering various subcommands.",
-		mixinStandardHelpOptions = true,
-		usageHelpWidth = 120,
-		subcommands = {
-				CommandLine.HelpCommand.class, AutoComplete.GenerateCompletion.class,
-				RValuesFromEvents.class, ExtractInfectionsByAge.class, CreateContactGraph.class,
-				ExtractInfectionGraph.class, VaccinationEffectivenessFromPotentialInfections.class,
-				VaccinationEffectiveness.class, FilterEvents.class, HospitalNumbersFromEvents.class, SecondaryAttackRateFromEvents.class
-		},
-		subcommandsRepeatable = true
+	name = "analysis",
+	description = "Analysis tool for Episim offering various subcommands.",
+	mixinStandardHelpOptions = true,
+	usageHelpWidth = 120,
+	subcommands = {
+		CommandLine.HelpCommand.class, AutoComplete.GenerateCompletion.class,
+		RValuesFromEvents.class, ExtractInfectionsByAge.class, CreateContactGraph.class,
+		ExtractInfectionGraph.class, VaccinationEffectivenessFromPotentialInfections.class,
+		VaccinationEffectiveness.class, FilterEvents.class, HospitalNumbersFromEvents.class,
+		SecondaryAttackRateFromEvents.class, InfectionHomeLocation.class
+	},
+	subcommandsRepeatable = true
 )
 public class AnalysisCommand implements Runnable {
 
@@ -88,15 +89,15 @@ public class AnalysisCommand implements Runnable {
 		Set<Path> scenarios = new LinkedHashSet<>();
 
 		Files.list(output)
-				.filter(Files::isDirectory)
-				.forEach(scenarios::add);
+			.filter(Files::isDirectory)
+			.forEach(scenarios::add);
 
 		log.info("Read " + scenarios.size() + " files");
 		log.info(scenarios);
 
 		Files.list(output)
-				.filter(Files::isDirectory)
-				.forEach(scenarios::add);
+			.filter(Files::isDirectory)
+			.forEach(scenarios::add);
 
 		scenarios.parallelStream().forEach(scenario -> {
 			try {
@@ -111,7 +112,7 @@ public class AnalysisCommand implements Runnable {
 	 * See {@link #forEachEvent(Path, Function, boolean, EventHandler...)}. Callback will always return true.
 	 */
 	public static List<String> forEachEvent(Path scenario, Consumer<String> callback, boolean preferReducedEvents, EventHandler... handler) {
-		return forEachEvent(scenario, s-> {
+		return forEachEvent(scenario, s -> {
 			callback.accept(s);
 			return true;
 		}, preferReducedEvents, handler);
@@ -147,9 +148,9 @@ public class AnalysisCommand implements Runnable {
 			List<Path> eventFiles;
 			try {
 				eventFiles = Files.list(events)
-						.filter(p -> p.getFileName().toString().contains("xml.gz"))
-						.sorted(Comparator.comparing(p -> p.getFileName().toString()))
-						.collect(Collectors.toList());
+					.filter(p -> p.getFileName().toString().contains("xml.gz"))
+					.sorted(Comparator.comparing(p -> p.getFileName().toString()))
+					.collect(Collectors.toList());
 			} catch (IOException e) {
 				throw new java.io.UncheckedIOException(e);
 			}
@@ -202,12 +203,12 @@ public class AnalysisCommand implements Runnable {
 
 		// find prefixed *config.xml
 		Optional<Path> config = Files.find(scenario, 1,
-				(path, attr) -> !path.getFileName().toString().equals("config.xml") && path.toString().endsWith("config.xml")).findFirst();
+			(path, attr) -> !path.getFileName().toString().equals("config.xml") && path.toString().endsWith("config.xml")).findFirst();
 
 		// If nothing was found, also try with events file
 		if (config.isEmpty())
 			config = Files.find(scenario, 1,
-					(path, attr) -> path.toString().endsWith("infectionEvents.txt")).findFirst();
+				(path, attr) -> path.toString().endsWith("infectionEvents.txt")).findFirst();
 
 		if (config.isEmpty()) {
 			return "";
@@ -246,7 +247,7 @@ public class AnalysisCommand implements Runnable {
 		try {
 			Optional<Path> o;
 			if (preferReducedEvents) {
-				 o = Files.list(scenario).filter(p -> p.getFileName().toString().endsWith("events_reduced.tar")).findFirst();
+				o = Files.list(scenario).filter(p -> p.getFileName().toString().endsWith("events_reduced.tar")).findFirst();
 
 				if (o.isEmpty()) {
 					o = Files.list(scenario).filter(p -> p.getFileName().toString().endsWith("events.tar")).findFirst();

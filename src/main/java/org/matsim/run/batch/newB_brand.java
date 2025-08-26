@@ -5,6 +5,7 @@ import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.episim.BatchRun;
 import org.matsim.episim.EpisimConfigGroup;
+import org.matsim.episim.analysis.InfectionHomeLocation;
 import org.matsim.episim.analysis.OutputAnalysis;
 import org.matsim.run.RunParallel;
 import org.matsim.run.modules.SnzBerlinProductionScenario;
@@ -62,7 +63,8 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 	 */
 	@Override
 	public Collection<OutputAnalysis> postProcessing() {
-		return List.of();
+		return List.of(new InfectionHomeLocation().withArgs("--output","./output/","--input","/scratch/projects/bzz0020/episim-input",
+			"--population-file", "br_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz"));
 	}
 
 	/*
