@@ -58,6 +58,8 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
 	public static class Builder extends SnzProductionScenario.Builder<SnzBerlinProductionScenario> {
 
+		public boolean workLeisureAdjustment = true;
+
 		private Snapshot snapshot = Snapshot.no;
 
 		private EpisimConfigGroup.DistrictLevelRestrictions locationBasedRestrictions = EpisimConfigGroup.DistrictLevelRestrictions.no;
@@ -81,6 +83,11 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
 		public Builder setAdaptiveRestrictions(AdaptiveRestrictions adaptiveRestrictions) {
 			this.adaptiveRestrictions = adaptiveRestrictions;
+			return this;
+		}
+
+		public Builder setWorkLeisureAdjustment(boolean workLeisureAdjustment) {
+			this.workLeisureAdjustment = workLeisureAdjustment;
 			return this;
 		}
 
@@ -125,6 +132,8 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 	private final EpisimConfigGroup.DistrictLevelRestrictions locationBasedRestrictions;
 	private final AdaptiveRestrictions adaptiveRestrictions;
 
+	private boolean workLeisureAdjustment = true;
+
 	/**
 	 * Path pointing to the input folder. Can be configured at runtime with EPISIM_INPUT variable.
 	 */
@@ -161,6 +170,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 		this.locationBasedRestrictions = builder.locationBasedRestrictions;
 		this.adaptiveRestrictions = builder.adaptiveRestrictions;
 		this.berlinBrandenburgInput = builder.berlinBrandenburgInput;
+		this.workLeisureAdjustment = builder.workLeisureAdjustment;
 
 		if (this.berlinBrandenburgInput == BerlinBrandenburgInput.berlin) {
 			INPUT = EpisimUtils.resolveInputPath("../shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input");
@@ -450,7 +460,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
 		//leisure & work factor
 		double leisureFactor = 1.6;
-		if (this.restrictions != Restrictions.no) {
+		if (this.restrictions != Restrictions.no && workLeisureAdjustment) {
 			builder.applyToRf("2020-10-15", "2020-12-14", (d, e) -> 1 - leisureFactor * (1 - e), "leisure");
 
 			double workVacFactor = 0.92;

@@ -16,9 +16,7 @@ get_run_parameters <- function(directory) {
 }
 
 # Read output. You can select what columns you want to read, to speed up the process. 
-read_combine_episim_output <- function(directory, file_root, allow_missing_files, columns = c()) {
-  
-  info_df <- read_delim(paste0(directory, "_info.txt"), delim = ";")
+read_combine_episim_output <- function(directory,info_df, file_root, allow_missing_files, columns = c()) {
   
   # gathers column names that should be included in final dataframe
   col_names <- colnames(info_df)
@@ -134,7 +132,7 @@ convert_infections_into_incidence <- function(directory, infections_raw, aggrega
     summarise(infections = mean(infections),
               nShowingSymptomsCumulative = mean(nShowingSymptomsCumulative),
               infections_week = mean(infections_week),
-              incidence = mean(incidence))
+              incidence = mean(incidence)) %>% ungroup()
   return(infections_aggregated)
 
 }

@@ -131,11 +131,11 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 
 		//		@Parameter({0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1.0})
 //		@Parameter({1.0})
-		@Parameter({0.6, 0.7, 0.8, 0.9, 1.0})
+		@Parameter({0.65, 0.7, 0.75, 0.8, 0.85, 0.9})
 		public double thetaFactor;
 
 		//		@Parameter({-1.0})
-		@Parameter({0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0})
+		@Parameter({0.5, 0.75, 1.0, 2.0, 4.0})
 		public double ode;
 
 

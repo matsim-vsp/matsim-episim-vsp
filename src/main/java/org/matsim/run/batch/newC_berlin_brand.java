@@ -41,6 +41,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 	private SnzBerlinProductionScenario getBindings(Params params) {
 		return new SnzBerlinProductionScenario.Builder()
 			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.berlinBrandenburg)
+			.setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
 			.setChristmasModel(SnzBerlinProductionScenario.ChristmasModel.no)
@@ -108,26 +109,26 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 	 */
 	public static final class Params {
 		// general
-		@GenerateSeeds(5)
+		@GenerateSeeds(3)
 		public long seed;
 
-		@Parameter({0.6, 0.7, 0.8, 0.9, 1.0})
+		@Parameter({0.55, 0.6, 0.65, 0.7, 0.75,})
 //		@Parameter({1.0})
 		public double thetaFactor;
 
 
-		@StringParameter({"true" ,"false"})
-//		@StringParameter({"true"})
+		@StringParameter({"true", "false"})
+//		@StringParameter({"false"})
 		public String importToBerlin;
 
-		@Parameter({0.01, 0.1, 0.5, 1.0, 1.65})
+		@Parameter({0.2, 0.4, 0.8, 1.0, 1.5, 2.0})
 		public double importMultSpring;
 
-		@Parameter({0.01, 0.1, 0.5, 1.0, 1.65})
+		@Parameter({1.0,10.0, 50.0, 100.0,})
 		public double importMultSummer;
 
-
-
+		@StringParameter({"true", "false"})
+		public String workLeisureAdjustment;
 	}
 
 
@@ -140,7 +141,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 				RunParallel.OPTION_SETUP, newC_berlin_brand.class.getName(),
 				RunParallel.OPTION_PARAMS, Params.class.getName(),
 				RunParallel.OPTION_TASKS, Integer.toString(1),
-				RunParallel.OPTION_ITERATIONS, Integer.toString(50),
+				RunParallel.OPTION_ITERATIONS, Integer.toString(10),
 				RunParallel.OPTION_METADATA
 		};
 

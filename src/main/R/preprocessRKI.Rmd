@@ -95,7 +95,7 @@ berlin_combined <- berlin_ref %>%
     by = "date"
   )
 
-period_filter <- between(berlin_combined$date, as.Date("2020-03-02"), as.Date("2020-05-31"))
+period_filter <- between(berlin_combined$date, as.Date("2020-03-02"), as.Date("2020-12-31"))
 
 ggplot(filter(berlin_combined, period_filter), aes(x = date)) +
   geom_line(aes(y = daily_new_ref, color = "Refdatum")) +
@@ -107,15 +107,26 @@ ggplot(filter(berlin_combined, period_filter), aes(x = date)) +
 ```
 ```{r}
 # smooth the curves with rolling 7 day incidence per 100.000
+
+
+tmpfile <- tempfile(fileext = ".csv")
+download.file("https://raw.githubusercontent.com/robert-koch-institut/COVID-19_7-Tage-Inzidenz_in_Deutschland/refs/heads/main/COVID-19-Faelle_7-Tage-Inzidenz_Bundeslaender.csv", tmpfile, mode = "wb")
+
+# Read from compressed file direct
+xxx  <- read_csv(tmpfile)
+
+xxx2 <- xxx %>% filter(Bundesland_id == "11") %>% filter(Altersgruppe == "00+")
+
 incidence_data_be <- berlin_combined %>%
   mutate(
-    incidence_ref = rollmean(daily_new_ref, 7, fill = NA, align = "right") / 3782202 * 1e5,
-    incidence_melde = rollmean(daily_new_melde, 7, fill = NA, align = "right") / 3782202 * 1e5
+    incidence_ref = rollsum(daily_new_ref, 7, fill = NA, align = "right") / 3782202 * 1e5,
+    incidence_melde = rollsum(daily_new_melde, 7, fill = NA, align = "right") / 3782202 * 1e5
   )
 
 ggplot(filter(incidence_data_be, period_filter), aes(x = date)) +
   geom_line(aes(y = incidence_ref, color = "Refdatum")) +
   geom_line(aes(y = incidence_melde, color = "Meldedatum")) +
+  geom_line(data = xxx2 %>% filter(Meldedatum < ymd("2020-12-31")), aes(Meldedatum,`Inzidenz_7-Tage`)) +
   labs(title = "7-Day Incidence per 100k (Berlin)", x = "Date", y = "Incidence", color = "Date Type") +
   theme_minimal()
 

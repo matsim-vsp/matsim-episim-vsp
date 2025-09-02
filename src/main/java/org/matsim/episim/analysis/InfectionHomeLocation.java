@@ -200,7 +200,7 @@
 			 lons.add(Math.round(coordWgs84.getX() * 10000.0) / 10000.0);
 
 
-			 if(event.getInfectorId().toString().startsWith("fake_")){
+			 if (event.getInfectorId() != null && event.getInfectorId().toString().startsWith("fake_")) {
 				 infTypes.add("import");
 			 } else {
 				 infTypes.add("normal");
