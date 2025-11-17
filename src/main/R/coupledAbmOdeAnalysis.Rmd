@@ -1,0 +1,400 @@
+---
+title: "coupledAbmOdeAnalysis"
+author: "Inan Bostanci & Jakob Rehmann"
+date: "2025-08-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(patchwork)
+library(zoo) 
+library(sf)
+library(tmap)
+library(tmaptools)
+
+source("masterJR-utils.R")
+```
+
+Some Defaults and chosen values
+
+```{r}
+POPULATION_BERLIN <- 3782202
+POPULATION_BRANDENBURG <- 2556747
+
+plot_start_date <- ymd("2020-03-01")
+plot_end_date <- ymd("2020-12-31")
+
+ODE <- 1.0
+THETA_FACTOR <- 0.7
+
+brand_districts <- c("Dahme-Spreewald", "Potsdam", "Barnim", "Märkisch-Oderland", "Oberhavel", "Havelland", "Teltow-Fläming", "Brandenburg an der Havel", "Cottbus", "Spree-Neiße", "Frankfurt (Oder)", "Potsdam-Mittelmark", "Elbe-Elster", "Oder-Spree", "Oberspreewald-Lausitz", "Ostprignitz-Ruppin", "Prignitz", "Uckermark")
+```
+
+# RKI data on reported cases
+
+RKI provides the daily number of new confirmed COVID-19 cases in Germany, available at the county level (IdLandkreis, starts with "11" for Berlin, "12" for Brandenburg), broken down by age group and gender. The data can be differentiated into "Meldedatum", which is the date of reporting, and "Refdatum", which is either the assumed date of the actual onset, or if unknown, the date of reporting.
+
+The data is available in CSV format and can be downloaded from <https://github.com/robert-koch-institut/SARS-CoV-2-Infektionen_in_Deutschland_Archiv>
+
+For the ODE fit, it seems that we used "Refdatum", which is the date of the actual onset or reporting date, and not "Meldedatum", which is the date of reporting. However, for the ABM, I think we used "Meldedatum" - this might make sense if the ABM enables to simulate the reporting process, while the ODE's I-compartment simulates the actual disease progression.
+
+```{r}
+# Helper function to process and aggregate RKI data
+process_rki_data <- function(df, date_col, region_prefix = "11") {
+  df %>%
+    filter(str_starts(as.character(IdLandkreis), region_prefix)) %>%
+    group_by(date = as_date(.data[[date_col]])) %>%
+    summarise(daily_new = sum(AnzahlFall, na.rm = TRUE), .groups = "drop") %>%
+    complete(date = seq(min(date), max(date), by = "1 day"), fill = list(daily_new = 0)) %>%
+    arrange(date)
+}
+```
+
+Load RKI data from Github
+
+```{r}
+# Load data from the RKI GitHub repository
+rki_repo_url <- "https://github.com/robert-koch-institut/SARS-CoV-2-Infektionen_in_Deutschland_Archiv/raw/refs/heads/main/Archiv/2021-05-31_Deutschland_SarsCov2_Infektionen.csv.xz"
+
+# Download to a temp file
+tmpfile <- tempfile(fileext = ".csv.xz")
+download.file(rki_repo_url, tmpfile, mode = "wb")
+
+# Read from compressed file directly
+raw_data <- read_csv(tmpfile)
+```
+
+calculate incidence for three study areas
+
+Note: when 'align = "right"' rollmean centers the mean around the right date of the range (for 7 observations between Mon & Sun, the value would be set to Sunday)
+
+```{r}
+# Load data and process both Refdatum 
+
+date_type <- "Refdatum"
+rki_berlin <- process_rki_data(raw_data, date_type) %>% 
+  mutate(incidence = rollsum(daily_new, 7, fill = NA,align = "right") / POPULATION_BERLIN * 1e5)
+
+rki_brand <- process_rki_data(raw_data, date_type, region_prefix = "12") %>%
+  mutate(incidence = rollsum(daily_new, 7, fill = NA,align = "right") /  POPULATION_BRANDENBURG * 1e5)
+
+rki_combined<- rbind(rki_brand, rki_berlin) %>% group_by(date) %>% 
+  summarise(daily_new = sum(daily_new))%>%
+  mutate(incidence = rollsum(daily_new, 7, fill = NA,align = "right") / (POPULATION_BRANDENBURG + POPULATION_BERLIN) * 1e5)
+
+
+```
+plausibility checks
+
+It seems that inan used the ReferenzDatum. So I will use this for now as well
+```{r}
+tmpfile <- tempfile(fileext = ".csv")
+download.file("https://raw.githubusercontent.com/robert-koch-institut/COVID-19_7-Tage-Inzidenz_in_Deutschland/refs/heads/main/COVID-19-Faelle_7-Tage-Inzidenz_Bundeslaender.csv", tmpfile, mode = "wb")
+
+# Read from compressed file direct
+rki2  <- read_csv(tmpfile)
+
+# Plausibility of Brandenburg
+
+rki2_brand <- rki2 %>% filter(Bundesland_id == "12") %>% filter(Altersgruppe == "00+")
+
+ode_incidence_brandenburg <- read_csv("/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input/ode_br_infectious_250212.csv") %>%
+  mutate(new_infections = infectious / 3 * POPULATION_BRANDENBURG  ) %>% 
+  mutate(incidence = rollsum(new_infections, 7, fill = NA, align = "right")/ POPULATION_BRANDENBURG * 100000)
+
+
+ggplot(rki_brand %>% filter(wday(date) ==5)) + geom_point(aes(date,incidence))  + 
+  scale_x_date(date_breaks = "1 month",date_labels = "%b\n'%y")  +
+  geom_line(data = rki2_brand %>% filter(Meldedatum < ymd("2020-12-31")), aes(Meldedatum,`Inzidenz_7-Tage`))+
+  geom_line(data = ode_incidence_brandenburg, aes(time, incidence), col = "yellow")
+
+
+# Plausibility of Berlin
+
+rki2_berlin <- rki2 %>% filter(Bundesland_id == "11") %>% filter(Altersgruppe == "00+")
+
+ode_incidence_berlin <- read_csv("/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/ode_be_infectious_250211.csv") %>%
+  mutate(new_infections = infectious / 3 * POPULATION_BRANDENBURG  ) %>% 
+  mutate(incidence = rollsum(new_infections, 7, fill = NA, align = "right")/ POPULATION_BRANDENBURG * 100000)
+
+
+ggplot(rki_berlin %>% filter(wday(date) ==5)) + geom_point(aes(date,incidence))  + 
+  scale_x_date(date_breaks = "1 month",date_labels = "%b\n'%y")  +
+  geom_line(data = rki2_berlin %>% filter(Meldedatum < ymd("2020-12-31")), aes(Meldedatum,`Inzidenz_7-Tage`))+
+  geom_line(data = ode_incidence_berlin, aes(time, incidence), col = "yellow")
+```
+
+# Episim Data
+
+Setup
+
+```{r}
+
+image_output_path <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/images/"
+
+common_style <- list(
+  scale_color_manual(values = c("RKI" = "red","EpiSim" = "black")),
+  scale_x_date(
+    date_breaks = "1 month",
+    date_labels = "%b\n'%y"
+  ),
+  scale_y_log10(limits = c(0.1,1000)),
+  theme_minimal(base_size = 14),
+  theme(legend.position = "bottom"),
+  labs(x = "Date", y = "SARS-CoV-2 Incidence", col = NULL)
+)
+
+```
+
+
+
+## Combined: Berlin + Brandenburg
+```{r}
+
+combined_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-11-11/1-both/"
+
+combined_districts <- c("Berlin", brand_districts)
+
+combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>%
+  filter(thetaFactor == 0.7,pHouseholds == 0.0, workLeisureAdjustment == FALSE,importToBerlin == FALSE) 
+# %>% 
+  # filter(pHouseholds == 0.35, importMult == 2)
+
+# combined_info %>% view()
+
+combined_raw <- read_combine_episim_output(combined_directory, combined_info,"infections.txt",TRUE, c("date","nShowingSymptomsCumulative","nSusceptible","district")) 
+
+# combined_raw %>% view()
+
+
+combined_params <- get_run_parameters(combined_directory)
+
+combined_filtered_berlin <- combined_raw  %>% filter(district == "Berlin")
+combined_filtered_brand <- combined_raw %>% 
+  filter(district %in% brand_districts) %>% 
+  group_by(across(all_of(c("date",combined_params)))) %>%
+  summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative), nSusceptible = sum(nSusceptible)) %>% 
+  mutate(district = "Brandenburg")
+
+combined_filtered_combined <- combined_raw %>% 
+  filter(district %in% combined_districts) %>% 
+  group_by(across(all_of(c("date",combined_params)))) %>%
+  summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative), nSusceptible = sum(nSusceptible)) %>% 
+  mutate(district = "Combined")
+
+combined_filtered <- rbind(combined_filtered_berlin, combined_filtered_brand, combined_filtered_combined)
+
+
+combined_incidence <- convert_infections_into_incidence(combined_directory,combined_filtered,TRUE)
+
+
+combined_incidence_filtered <- combined_incidence %>% 
+  select(date, incidence, district) %>% 
+  mutate(scenario = "EpiSim") %>% 
+  rbind(rki_combined %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Combined")) %>% 
+  rbind(rki_berlin %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Berlin")) %>% 
+  rbind(rki_brand %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Brandenburg")) %>% 
+  filter(date >= plot_start_date, date <= plot_end_date) %>% 
+  filter(lubridate::wday(date, label = TRUE)=="Thu")
+
+ggplot(combined_incidence_filtered %>% filter(scenario !="RKI")) + geom_point(aes(date,incidence, col = district))
+  
+
+combined_plot_combined <- ggplot() +
+  geom_point(data = combined_incidence_filtered %>% filter(district == "Combined"),mapping = aes(date,incidence, col = scenario)) + 
+  labs(title ="Incidence in Berlin + Brandenburg", subtitle = "Berlin + Brandenburg modelled as ABM") +
+  common_style
+
+# combined_plot_combined
+
+combined_plot_berlin <- ggplot() +
+  geom_point(data = combined_incidence_filtered %>% filter(district == "Berlin"),mapping = aes(date,incidence, col = scenario),show.legend = FALSE) + 
+  labs(title ="Incidence in Berlin only", subtitle = "Berlin + Brandenburg modelled as ABM") +
+  common_style
+
+combined_plot_berlin
+
+combined_plot_brand <- ggplot() +
+  geom_point(data = combined_incidence_filtered %>% filter(district == "Brandenburg"), mapping = aes(date,incidence, col = scenario), show.legend = FALSE) + 
+  labs(title ="Incidence in Brandenburg only", subtitle = "Berlin + Brandenburg modelled as ABM") +
+  common_style
+
+
+# plot all three
+combined_plot <- combined_plot_combined / (combined_plot_brand | combined_plot_berlin)  + plot_annotation(tag_levels = 'a')
+
+# combined_plot
+ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, width = 12, height = 8)
+
+
+```
+
+
+## Brandenburg
+
+what happens if I change the max outdoor fraction for this simulation also to 0.8, then there will be more infections in the summer! 
+
+
+```{r}
+
+brand_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-10-17/2-brand-quick/"
+
+
+brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>% 
+    filter(ode == 4.0, thetaFactor == 0.7)
+
+
+brand_raw <- read_combine_episim_output(brand_directory,brand_info,"infections.txt",FALSE, c("date","nShowingSymptomsCumulative","nSusceptible","district"))
+
+brand_params <- get_run_parameters(brand_directory)
+
+brand_filtered <- brand_raw %>% 
+  filter(district %in% brand_districts) %>% 
+  group_by(across(all_of(c("date",brand_params)))) %>%
+  summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative), nSusceptible = sum(nSusceptible)) %>% 
+  mutate(district = "Brandenburg")
+
+brand_incidence <- convert_infections_into_incidence(brand_directory,brand_filtered,TRUE)
+
+brand_incidence_filtered <- brand_incidence %>% 
+  select(date, incidence) %>% 
+  mutate(scenario = "EpiSim") %>% 
+  rbind(rki_brand %>% select(date, incidence) %>% mutate(scenario = "RKI")) %>% 
+  filter(date >= plot_start_date, date <= plot_end_date) %>% 
+  filter(lubridate::wday(date, label = TRUE)=="Thu")
+
+brand_plot <- ggplot() +
+  geom_point(data = brand_incidence_filtered, mapping = aes(date,incidence, col = scenario)) +
+  labs(title ="Incidence in Brandenburg", subtitle = "Coupled Model: Brandenburg as ABM | Berlin as ODE") + 
+  common_style
+
+brand_plot
+ggsave(paste0(image_output_path,"results_brand.pdf"), plot = brand_plot, width = 6, height = 4)
+
+```
+
+## Berlin
+
+```{r}
+
+berlin_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-08-14/1a-berlin/"
+
+berlin_info <- read_delim(paste0(berlin_directory, "_info.txt"), delim = ";") %>% 
+ filter(ode == ODE, thetaFactor %in% c(THETA_FACTOR,1.0))
+
+
+berlin_raw <- read_combine_episim_output(berlin_directory,berlin_info,"infections.txt",FALSE, c("date","nShowingSymptomsCumulative","nSusceptible","district"))
+
+berlin_filtered <- berlin_raw %>% filter(district == "Berlin")
+
+berlin_incidence <- convert_infections_into_incidence(berlin_directory,berlin_filtered,TRUE)
+
+berlin_incidence_filtered <-  berlin_incidence %>% 
+  mutate(scenario = paste0("EpiSim:",thetaFactor)) %>% 
+  select(date, incidence, scenario) %>% 
+  rbind(rki_berlin %>% select(date, incidence) %>% mutate(scenario = "RKI")) %>% 
+  filter(date >= plot_start_date, date <= plot_end_date) %>% 
+  filter(lubridate::wday(date, label = TRUE)=="Thu")
+
+berlin_plot <- ggplot() +
+  geom_point(data = berlin_incidence_filtered,mapping = aes(date,incidence, col = scenario)) + 
+  labs(title ="Incidence in Berlin", subtitle = "Coupled Model: Berlin as ABM | Brandenburg as ODE") +
+  common_style +
+    scale_color_manual(values = c("RKI" = "red","EpiSim:1" = "grey", setNames("black", paste0("EpiSim:", THETA_FACTOR)))) 
+
+berlin_plot
+
+ggsave(paste0(image_output_path,"results_berlin.pdf"), plot = berlin_plot, width = 6, height = 4)
+
+```
+
+
+
+
+# Geospatial & Temporal Analysis
+
+```{r}
+berlin_brandenburg_envelope <- st_read("/Users/jakob/Dropbox/Documents/04_Work-VSP/SHAPE_FILES/berlinBrandenburg/berlinBrandenburg.shp") %>% st_transform(4236)
+
+# plot infection map
+info_df <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";")
+
+
+info_df %>% pull(seed) %>% unique() %>% as.character()
+runId <- info_df %>% filter(seed == 7564655870752978944,ode == ODE, thetaFactor == THETA_FACTOR) %>% pull(RunId)
+
+
+geospatial <- read_delim(paste0(brand_directory,runId,".infectionLoc.csv")) %>%
+  st_as_sf(coords = c("home_lon","home_lat"), crs = 4236) %>%
+  st_filter(berlin_brandenburg_envelope) %>%   
+  mutate(infection_type = factor(infection_type, levels = c("normal","import"),labels = c("ABM Infections","ODE Import"))) %>% 
+  mutate(date = ymd("2020-03-20") + daysSinceStart)
+
+
+tmap_mode("plot")
+
+geospatial_plot_hist <- geospatial %>% 
+  ggplot() +
+  geom_histogram(aes(date, fill = infection_type), binwidth = 7)  +
+  scale_x_date(
+    date_breaks = "1 month",      # show every month
+    date_labels = "%b\n'%y"         # e.g., Jan 2025
+  ) +
+  # scale_y_log10() + 
+  labs(title ="New Infections in Brandenburg", subtitle = "Coupled Model: Brandenburg as ABM | Berlin as ODE", x = "Date", y = "New Infections") +
+  theme_minimal(base_size = 14) 
+
+geospatial_plot_hist
+
+ggsave(paste0(image_output_path,"results_geospatial_hist.pdf"), plot = geospatial_plot_hist, width = 6, height = 4)
+
+for(startDay in seq(150,300,by = 7)){
+  endDay <- startDay + 7
+  map <- tm_basemap("Esri.WorldGrayCanvas") + 
+    tm_shape(geospatial %>% filter(daysSinceStart > startDay, daysSinceStart <= endDay), bbox = bb(berlin_brandenburg_envelope)) +
+    tm_dots(fill = "infection_type", fill_alpha = 0.5,fill.scale = tm_scale(values = c("ODE Import" = "red", "ABM Infections" = "blue"))) +
+    tm_title(paste0("Day ",startDay," - ",endDay))
+  print(map)
+}
+
+
+```
+
+
+# DEPRECATED
+
+## BERLIN ALONE
+
+```{r}
+berlin_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-09-12/1-berlin-only/"
+
+berlin_info <- read_delim(paste0(berlin_directory, "_info.txt"), delim = ";")
+
+
+berlin_raw <- read_combine_episim_output(berlin_directory,berlin_info,"infections.txt",FALSE, c("date","nShowingSymptomsCumulative","nSusceptible","district"))
+
+berlin_filtered <- berlin_raw %>% filter(district == "Berlin")
+
+berlin_incidence <- convert_infections_into_incidence(berlin_directory,berlin_filtered,TRUE)
+
+berlin_incidence_filtered <-  berlin_incidence %>% 
+  mutate(scenario = "EpiSim") %>% 
+  select(date, incidence, scenario) %>% 
+  rbind(rki_berlin %>% select(date, incidence) %>% mutate(scenario = "RKI")) %>% 
+  filter(date >= plot_start_date, date <= plot_end_date) %>% 
+  filter(lubridate::wday(date, label = TRUE)=="Thu")
+
+berlin_plot <- ggplot() +
+  geom_point(data = berlin_incidence_filtered,mapping = aes(date,incidence, col = scenario)) + 
+  labs(title ="Incidence in Berlin", subtitle = "Coupled Model: Berlin as ABM | Brandenburg as ODE") +
+  common_style
+
+berlin_plot
+
+# ggsave(paste0(image_output_path,"results_berlin.pdf"), plot = berlin_plot, width = 6, height = 4)
+```
+

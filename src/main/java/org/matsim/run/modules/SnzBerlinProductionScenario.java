@@ -56,6 +56,8 @@ import java.util.function.BiFunction;
  */
 public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
+
+
 	public static class Builder extends SnzProductionScenario.Builder<SnzBerlinProductionScenario> {
 
 		public boolean workLeisureAdjustment = true;
@@ -66,16 +68,20 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 		private AdaptiveRestrictions adaptiveRestrictions = AdaptiveRestrictions.no;
 
 		private BerlinBrandenburgInput berlinBrandenburgInput = BerlinBrandenburgInput.berlin;
+		private double maxOutdoorFraction = 1.0;
+
 
 
 		public Builder setBerlinBrandenburgInput(BerlinBrandenburgInput berlinBrandenburgInput) {
 			this.berlinBrandenburgInput = berlinBrandenburgInput;
 			return this;
 		}
+
 		public Builder setSnapshot(Snapshot snapshot) {
 			this.snapshot = snapshot;
 			return this;
 		}
+
 		public Builder setLocationBasedRestrictions(EpisimConfigGroup.DistrictLevelRestrictions locationBasedRestrictions) {
 			this.locationBasedRestrictions = locationBasedRestrictions;
 			return this;
@@ -94,6 +100,11 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 		@Override
 		public SnzBerlinProductionScenario build() {
 			return new SnzBerlinProductionScenario(this);
+		}
+
+		public Builder setMaxOutdoorFraction(double maxOutdoorFraction) {
+			this.maxOutdoorFraction = maxOutdoorFraction;
+			return this;
 		}
 	}
 	public static final List<String> BRANDENBURG_LANDKREISE = List.of("Elbe-Elster", "Barnim", "Prignitz", "Uckermark", "Oberspreewald-Lausitz", "Potsdam-Mittelmark", "Märkisch-Oderland", "Oberhavel", "Ostprignitz-Ruppin", "Potsdam", "Brandenburg an der Havel", "Frankfurt (Oder)", "Dahme-Spreewald", "Teltow-Fläming", "Oder-Spree", "Havelland", "Cottbus", "Spree-Neiße");
@@ -132,7 +143,9 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 	private final EpisimConfigGroup.DistrictLevelRestrictions locationBasedRestrictions;
 	private final AdaptiveRestrictions adaptiveRestrictions;
 
-	private boolean workLeisureAdjustment = true;
+	private boolean workLeisureAdjustment;
+
+	private final double maxOutdoorFraction;
 
 	/**
 	 * Path pointing to the input folder. Can be configured at runtime with EPISIM_INPUT variable.
@@ -171,6 +184,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 		this.adaptiveRestrictions = builder.adaptiveRestrictions;
 		this.berlinBrandenburgInput = builder.berlinBrandenburgInput;
 		this.workLeisureAdjustment = builder.workLeisureAdjustment;
+		this.maxOutdoorFraction = builder.maxOutdoorFraction;
 
 		if (this.berlinBrandenburgInput == BerlinBrandenburgInput.berlin) {
 			INPUT = EpisimUtils.resolveInputPath("../shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input");
@@ -235,6 +249,9 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 				.withAgeGroup("60+", 915851)
 		);
 
+
+
+
 		// TODO: from Cologne, do we need?
 		//		Multibinder.newSetBinder(binder(), SimulationListener.class)
 		//				.addBinding().to(HouseholdSusceptibility.class);
@@ -275,7 +292,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
 		config.vehicles().setVehiclesFile(INPUT.resolve("de_2020-vehicles.xml").toString());
 
-		// overwritten later, if location-based restrictions implemented
+
 
 
 		//episim config
@@ -283,6 +300,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
 
 		// SET INPUT FILES
+        // overwritten later, if location-based restrictions implemented
 		config.plans().setInputFile(inputForSample(prefixShort + "_2020-week_snz_entirePopulation_emptyPlans_withDistricts_%dpt_split.xml.gz", sample));
 
 		episimConfig.addInputEventsFile(inputForSample(prefixShort + "_2020-week_snz_episim_events_wt_%dpt_split.xml.gz", sample))
@@ -448,7 +466,7 @@ public final class SnzBerlinProductionScenario extends SnzProductionScenario {
 
 			SnzProductionScenario.configureWeather(episimConfig, weatherModel,
 				INPUT.resolve("tempelhofWeatherUntil20220208.csv").toFile(),
-				INPUT.resolve("temeplhofWeatherDataAvg2000-2020.csv").toFile(), 1.0)
+				INPUT.resolve("temeplhofWeatherDataAvg2000-2020.csv").toFile(), this.maxOutdoorFraction)
 			;
 
 

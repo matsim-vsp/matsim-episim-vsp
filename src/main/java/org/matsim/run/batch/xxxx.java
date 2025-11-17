@@ -18,15 +18,19 @@ import org.matsim.run.modules.SnzProductionScenario;
 
 import javax.annotation.Nullable;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 
 /**
  * boilerplate batch for berlin
  */
-public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
+public class xxxx implements BatchRun<xxxx.Params> {
 
-
+	/*
+	 * here you can swap out vaccination model, antibody model, etc.
+	 * See CologneBMBF202310XX_soup.java for an example
+	 */
 	@Nullable
 	@Override
 	public Module getBindings(int id, @Nullable  Params params) {
@@ -67,13 +71,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 //								.withShape(SnzCologneProductionScenario.INPUT.resolve("CologneDistricts.zip"))
 //								.withFeature("STT_NAME", vingst, altstadtNord, bickendorf, weiden)
 				);
-
-				Multibinder<SimulationListener> listener = Multibinder.newSetBinder(binder(), SimulationListener.class);
-
-				listener.addBinding().to(HouseholdSusceptibility.class);
 			}
-
-
 		});
 	}
 
@@ -159,23 +157,25 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 	 */
 	public static final class Params {
 		// general
-		@GenerateSeeds(5) //5
+		@GenerateSeeds(1) //5
 		public long seed;
 
-		@Parameter({0.0, 0.1, 0.15, 0.2, 0.35, 0.5}) // 6
+		@Parameter({0.0, 1.0}) // 3
 		public double pHouseholds;
 
 
 		//		@Parameter({.5,.6, .7, .8, .9, 1}) // 6
-		@Parameter({.5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1}) // 11
+//		@Parameter({.5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1}) // 11
+		@Parameter({1.0})
 		public double thetaFactor;
 
 
-		@StringParameter({"true", "false"}) // 2
+
+		@StringParameter({"true",}) // 2
 //		@StringParameter({"false"})
 		public String importToBerlin;
 
-		@Parameter({1.0}) //1
+		@Parameter({1.0,}) //2
 		public double importMult;
 
 
@@ -201,7 +201,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 	 */
 	public static void main(String[] args) {
 		String[] args2 = {
-				RunParallel.OPTION_SETUP, newC_berlin_brand.class.getName(),
+				RunParallel.OPTION_SETUP, xxxx.class.getName(),
 				RunParallel.OPTION_PARAMS, Params.class.getName(),
 				RunParallel.OPTION_TASKS, Integer.toString(1),
 				RunParallel.OPTION_ITERATIONS, Integer.toString(10),
@@ -212,9 +212,9 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 	}
 
 
-	static void configureAntibodies(Map<ImmunityEvent, Map<VirusStrain, Double>> initialAntibodies,
-									Map<ImmunityEvent, Map<VirusStrain, Double>> antibodyRefreshFactors,
-									double mutEscDelta, double mutEscBa1, double mutEscBa5) {
+	private void configureAntibodies(Map<ImmunityEvent, Map<VirusStrain, Double>> initialAntibodies,
+									 Map<ImmunityEvent, Map<VirusStrain, Double>> antibodyRefreshFactors,
+									 double mutEscDelta, double mutEscBa1, double mutEscBa5) {
 		for (VaccinationType immunityType : VaccinationType.values()) {
 			initialAntibodies.put(immunityType, new EnumMap<>( VirusStrain.class ) );
 			for (VirusStrain virusStrain : VirusStrain.values()) {
