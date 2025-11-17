@@ -44,7 +44,6 @@ process_rki_data <- function(df, date_col, region_prefix = "11") {
 Load data from Github
 ```{r}
 # Load data from the RKI GitHub repository
-library(readr)
 rki_repo_url <- "https://github.com/robert-koch-institut/SARS-CoV-2-Infektionen_in_Deutschland_Archiv/raw/refs/heads/main/Archiv/2021-05-31_Deutschland_SarsCov2_Infektionen.csv.xz"
 
 # Download to a temp file
@@ -253,6 +252,16 @@ incidence_data_bebr <- bebr_combined %>%
   )
 
 ggplot(filter(incidence_data_bebr, period_filter), aes(x = date)) +
+  geom_line(aes(y = incidence_ref, color = "Refdatum")) +
+  geom_line(aes(y = incidence_melde, color = "Meldedatum")) +
+  labs(title = "7-Day Incidence per 100k (Berlin + Brandenburg)", x = "Date", y = "Incidence", color = "Date Type") +
+  theme_minimal()
+```
+
+Plot the incidence for the full year
+```{r}
+period_filter_2020 <- between(bebr_combined$date, as.Date("2020-03-02"), as.Date("2020-12-31"))
+ggplot(filter(incidence_data_bebr, period_filter_2020), aes(x = date)) +
   geom_line(aes(y = incidence_ref, color = "Refdatum")) +
   geom_line(aes(y = incidence_melde, color = "Meldedatum")) +
   labs(title = "7-Day Incidence per 100k (Berlin + Brandenburg)", x = "Date", y = "Incidence", color = "Date Type") +
