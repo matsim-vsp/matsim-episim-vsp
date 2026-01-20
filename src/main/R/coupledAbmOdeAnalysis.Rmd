@@ -245,7 +245,7 @@ brand_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-0
 
 
 brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>% 
-    filter(ode == 4.0, thetaFactor == 0.7)
+    filter(ode %in% c(1.0,4.0), thetaFactor == 0.7)
 
 
 brand_raw <- read_combine_episim_output(brand_directory,brand_info,"infections.txt",FALSE, c("date","nShowingSymptomsCumulative","nSusceptible","district"))
@@ -284,7 +284,7 @@ ggsave(paste0(image_output_path,"results_brand.pdf"), plot = brand_plot, width =
 berlin_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-08-14/1a-berlin/"
 
 berlin_info <- read_delim(paste0(berlin_directory, "_info.txt"), delim = ";") %>% 
- filter(ode == ODE, thetaFactor %in% c(THETA_FACTOR,1.0))
+ filter(ode == ODE, thetaFactor %in% c(0.7,1.0))
 
 
 berlin_raw <- read_combine_episim_output(berlin_directory,berlin_info,"infections.txt",FALSE, c("date","nShowingSymptomsCumulative","nSusceptible","district"))

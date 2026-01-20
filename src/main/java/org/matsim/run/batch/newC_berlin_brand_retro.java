@@ -24,7 +24,7 @@ import java.util.*;
 /**
  * boilerplate batch for berlin
  */
-public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
+public class newC_berlin_brand_retro implements BatchRun<newC_berlin_brand_retro.Params> {
 
 
 	@Nullable
@@ -35,27 +35,27 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 			protected void configure() {
 				// ANTIBODY MODEL
 				// default values
-				double mutEscDelta = 29.2 / 10.9;
-				double mutEscBa1 = 10.9 / 1.9;
-				double mutEscBa5 = 5.0;
-
-				//initial antibodies
-				Map<ImmunityEvent, Map<VirusStrain, Double>> initialAntibodies = new HashMap<>();
-				Map<ImmunityEvent, Map<VirusStrain, Double>> antibodyRefreshFactors = new HashMap<>();
-				configureAntibodies(initialAntibodies, antibodyRefreshFactors, mutEscDelta, mutEscBa1, mutEscBa5);
-
-				AntibodyModel.Config antibodyConfig = new AntibodyModel.Config(initialAntibodies, antibodyRefreshFactors);
-
-				double immuneSigma = 3.0;
-				if (params != null) {
-					antibodyConfig.setImmuneReponseSigma(immuneSigma);
-					antibodyConfig.setHalfLifeDays(params.hl);
-				}
-
-				bind(AntibodyModel.Config.class).toInstance(antibodyConfig);
-
-
-				UtilsJR.printInitialAntibodiesToConsole(initialAntibodies, true);
+//				double mutEscDelta = 29.2 / 10.9;
+//				double mutEscBa1 = 10.9 / 1.9;
+//				double mutEscBa5 = 5.0;
+//
+//				//initial antibodies
+//				Map<ImmunityEvent, Map<VirusStrain, Double>> initialAntibodies = new HashMap<>();
+//				Map<ImmunityEvent, Map<VirusStrain, Double>> antibodyRefreshFactors = new HashMap<>();
+//				configureAntibodies(initialAntibodies, antibodyRefreshFactors, mutEscDelta, mutEscBa1, mutEscBa5);
+//
+//				AntibodyModel.Config antibodyConfig = new AntibodyModel.Config(initialAntibodies, antibodyRefreshFactors);
+//
+//				double immuneSigma = 3.0;
+//				if (params != null) {
+//					antibodyConfig.setImmuneReponseSigma(immuneSigma);
+//					antibodyConfig.setHalfLifeDays(params.hl);
+//				}
+//
+//				bind(AntibodyModel.Config.class).toInstance(antibodyConfig);
+//
+//
+//				UtilsJR.printInitialAntibodiesToConsole(initialAntibodies, true);
 
 				if (params == null) return;
 
@@ -90,7 +90,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
 			.setWeatherModel(params == null || params.fallThreshold == 25.0 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_185_225)
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
-			.setInfectionModel(InfectionModelWithAntibodies.class)
+//			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
 			.setChristmasModel(SnzBerlinProductionScenario.ChristmasModel.no)
 			.setOdeCoupling(SnzProductionScenario.OdeCoupling.no)
@@ -173,7 +173,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 		public double thetaFactor;
 
 
-		@StringParameter({"true"}) // 1
+		@StringParameter({"true", "false"}) // 2
 //		@StringParameter({"false"})
 		public String importToBerlin;
 
@@ -193,8 +193,8 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 		@Parameter({25.})
 		public double fallThreshold;
 
-		@Parameter({60, 75, 90, 105, 120}) //5
-		public double hl;
+//		@Parameter({60, 75, 90, 105, 120}) //5
+//		public double hl;
 
 		// 5 * 3 * 11 * 2 * 2 *2 = 1320
 
@@ -209,7 +209,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 	 */
 	public static void main(String[] args) {
 		String[] args2 = {
-				RunParallel.OPTION_SETUP, newC_berlin_brand.class.getName(),
+				RunParallel.OPTION_SETUP, newC_berlin_brand_retro.class.getName(),
 				RunParallel.OPTION_PARAMS, Params.class.getName(),
 				RunParallel.OPTION_TASKS, Integer.toString(1),
 				RunParallel.OPTION_ITERATIONS, Integer.toString(10),
