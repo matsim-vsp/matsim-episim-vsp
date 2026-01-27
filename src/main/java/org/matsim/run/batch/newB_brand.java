@@ -26,10 +26,6 @@ import java.util.*;
  */
 public class newB_brand implements BatchRun<newB_brand.Params> {
 
-	/*
-	 * here you can swap out vaccination model, antibody model, etc.
-	 * See CologneBMBF202310XX_soup.java for an example
-	 */
 
 	@Nullable
 	@Override
@@ -87,13 +83,16 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 	 */
 	private SnzBerlinProductionScenario getBindings(Params params) {
 		return new SnzBerlinProductionScenario.Builder()
-			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.brandenburg)
+			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.berlinBrandenburg)
+			.setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
+			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
+			.setWeatherModel(params == null || params.fallThreshold == 25.0 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_185_225)
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
+			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
 			.setChristmasModel(SnzBerlinProductionScenario.ChristmasModel.no)
-			.setSample(25)
-			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setOdeCoupling(params == null || params.ode != -1.0 ? SnzProductionScenario.OdeCoupling.yes : SnzProductionScenario.OdeCoupling.no)
+			.setSample(25)
 			.build();
 	}
 
@@ -133,20 +132,6 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * params.thetaFactor);
 
 
-//		if (params.ode == -1.0) {
-//			if (Objects.equals(params.importToBerlin, "true")) {
-//				episimConfig.setInitialInfectionDistrict("Berlin");
-//			}
-//
-//			if (params.importMult != 1.0) {
-//				for (NavigableMap<LocalDate, Integer> dateToImportMap : episimConfig.getInfections_pers_per_day().values()) {
-//
-//					dateToImportMap.replaceAll((k, v) -> (int) (v * params.importMult));
-//
-//				}
-//			}
-//
-//		}
 
 		// ODE COUPLING
 
@@ -177,31 +162,25 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		@GenerateSeeds(5)
 		public long seed;
 
-		@Parameter({0.0, 0.1, 0.15, 0.2, 0.35, 0.5}) // 6
+		@Parameter({0.0})
 		public double pHouseholds;
 
-
-		//		@Parameter({.5,.6, .7, .8, .9, 1}) // 6
-		@Parameter({.5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1}) // 11
+		@Parameter({.5, .6, .65, .7, .75, .8, .85, .9,  1}) // 9
 		public double thetaFactor;
 
 		//		@Parameter({-1.0})
-		@Parameter({0.5, 0.75, 1.0, 2.0, 4.0})
+		@Parameter({-1.0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0, 3.0, 4.0})  //10
 		public double ode;
 
-		// 5 *8 * 5 * 4 = 800
+		@StringParameter({"true", "false"}) // 2
+		public String workLeisureAdjustment;
 
+		@Parameter({0.8})
+		public double maxOutdoorFraction;
 
+		@Parameter({25.})
+		public double fallThreshold;
 
-//		@StringParameter({"true","false"})
-//		public String importToBerlin;
-//
-//		@Parameter({0.1, 0.25, 0.5, 0.75, 1.0})
-//		public double importMult;
-
-
-//		@Parameter({0.25, .5, .75, 1.})
-//		public double importMult;
 	}
 
 

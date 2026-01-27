@@ -159,8 +159,11 @@ combined_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/202
 
 combined_districts <- c("Berlin", brand_districts)
 
-combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>%
-  filter(thetaFactor == 0.7,pHouseholds == 0.0, workLeisureAdjustment == FALSE,importToBerlin == FALSE) 
+# combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>%
+  # filter(thetaFactor == 0.7,pHouseholds == 0.0, workLeisureAdjustment == FALSE,importToBerlin == FALSE) 
+
+combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>% 
+  filter(thetaFactor %in% c(0.7),  workLeisureAdjustment == TRUE,importToBerlin == TRUE)
 # %>% 
   # filter(pHouseholds == 0.35, importMult == 2)
 
@@ -168,12 +171,12 @@ combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";"
 
 combined_raw <- read_combine_episim_output(combined_directory, combined_info,"infections.txt",TRUE, c("date","nShowingSymptomsCumulative","nSusceptible","district")) 
 
-# combined_raw %>% view()
 
 
 combined_params <- get_run_parameters(combined_directory)
 
 combined_filtered_berlin <- combined_raw  %>% filter(district == "Berlin")
+
 combined_filtered_brand <- combined_raw %>% 
   filter(district %in% brand_districts) %>% 
   group_by(across(all_of(c("date",combined_params)))) %>%
@@ -201,7 +204,7 @@ combined_incidence_filtered <- combined_incidence %>%
   filter(date >= plot_start_date, date <= plot_end_date) %>% 
   filter(lubridate::wday(date, label = TRUE)=="Thu")
 
-ggplot(combined_incidence_filtered %>% filter(scenario !="RKI")) + geom_point(aes(date,incidence, col = district))
+# ggplot(combined_incidence_filtered %>% filter(scenario !="RKI")) + geom_point(aes(date,incidence, col = district))
   
 
 combined_plot_combined <- ggplot() +
@@ -226,10 +229,12 @@ combined_plot_brand <- ggplot() +
 
 # plot all three
 combined_plot <- combined_plot_combined / (combined_plot_brand | combined_plot_berlin)  + plot_annotation(tag_levels = 'a')
-
+# combined_plot
 # combined_plot
 ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, width = 12, height = 8)
 
+
+ggplot(rki_berlin) + geom_point(aes(date,incidence), col = "red")
 
 ```
 
