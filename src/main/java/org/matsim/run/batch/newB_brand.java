@@ -83,7 +83,7 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 	 */
 	private SnzBerlinProductionScenario getBindings(Params params) {
 		return new SnzBerlinProductionScenario.Builder()
-			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.berlinBrandenburg)
+			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.brandenburg)
 			.setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
 			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
 			.setWeatherModel(params == null || params.fallThreshold == 25.0 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_185_225)
