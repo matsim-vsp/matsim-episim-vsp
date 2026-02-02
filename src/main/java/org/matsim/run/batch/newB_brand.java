@@ -131,6 +131,25 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 
 		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * params.thetaFactor);
 
+		double importMult = Double.parseDouble(params.importMult.replace("x", ""));
+		for (NavigableMap<LocalDate, Integer> dateToImportMap : episimConfig.getInfections_pers_per_day().values()) {
+
+			for(LocalDate date : dateToImportMap.keySet()) {
+
+//				dateToImportMap.put(date, (int) (dateToImportMap.get(date) * params.importMult));
+				if (date.isBefore(LocalDate.of(2020, 5, 1))) {
+					dateToImportMap.put(date, (int) (dateToImportMap.get(date) * importMult));
+				} else {
+					if (Objects.equals(params.importSummerOn, "true")) {
+						dateToImportMap.put(date, (int) (dateToImportMap.get(date) * importMult));
+					} else {
+						dateToImportMap.put(date, (int) (dateToImportMap.get(date) * 0.));
+					}
+				}
+			}
+
+		}
+
 
 
 		// ODE COUPLING
@@ -165,12 +184,18 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		@Parameter({0.0})
 		public double pHouseholds;
 
-		@Parameter({.5, .6, .65, .7, .75, .8, .85, .9,  1}) // 9
+		@Parameter({.7, .75, .8}) // 3
 		public double thetaFactor;
 
 		//		@Parameter({-1.0})
-		@Parameter({-1.0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.5, 2.0, 3.0, 4.0})  //10
+		@Parameter({ 0.5,  0.75,  1.0, 1.5, 3.0})  //5
 		public double ode;
+
+		@StringParameter({"x0.0","x0.075", "x0.1", "x0.125", "x0.25"}) //4
+		public String importMult;
+
+		@StringParameter({"true", "false"}) //3
+		public String importSummerOn;
 
 		@StringParameter({"true", "false"}) // 2
 		public String workLeisureAdjustment;

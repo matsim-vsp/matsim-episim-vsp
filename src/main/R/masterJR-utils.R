@@ -59,9 +59,9 @@ read_combine_episim_output <- function(directory,info_df, file_root, allow_missi
 
 
 # Read in zipped files...
-read_combine_episim_output_zipped <- function(directory, file_root) {
+read_combine_episim_output_zipped <- function(directory,info_df, file_root, columns = c()) {
   
-  info_df <- read_delim(paste0(directory, "_info.txt"), delim = ";")
+  # info_df <- read_delim(paste0(directory, "_info.txt"), delim = ";")
   
   # gathers column names that should be included in final dataframe
   col_names <- colnames(info_df)
@@ -69,23 +69,21 @@ read_combine_episim_output_zipped <- function(directory, file_root) {
   
   episim_df_all_runs <- data.frame()
   
-  # runsToInclude <- c("calibration1824","calibration288","calibration1056", "calibration2208","calibration672","calibration1440")
-  for (row in seq_len(nrow(info_df))) {
+    for (row in seq_len(nrow(info_df))) {
     
     runId <- info_df$RunId[row]
-    
-    # if(runId %in% runsToInclude){
-    #
-    # } else{
-    #   next
-    # }
-    
     
     zipDir <- paste0(directory,"summaries/",runId,".zip")
     
     file_name <- paste0(runId, ".", file_root)
     
-    df_for_run <- read_delim(unz(zipDir, file_name))
+    if(is_empty(columns)) {
+      df_for_run <- read_delim(unz(zipDir, file_name),"\t", escape_double = FALSE, trim_ws = TRUE)
+    } else {
+      df_for_run <- read_delim(unz(zipDir, file_name), "\t", escape_double = FALSE, trim_ws = TRUE, col_select = columns)
+    }
+    
+    # df_for_run <- read_delim(unz(zipDir, file_name))
     
     if (dim(df_for_run)[1] == 0) {
       warning(paste0(file_name, " is empty"))

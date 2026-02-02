@@ -151,11 +151,34 @@ common_style <- list(
 ```
 
 
+With Antibodies:
+```{r}
+directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-01-20/1-both-ab-on/"
+combined_info <- read_delim(paste0(directory, "_info.txt"), delim = ";") %>% 
+  filter(thetaFactor %in% c(0.75),  workLeisureAdjustment == TRUE, importMultSpring == 0.25,hl == 60.0)
+
+berlin_raw <- read_combine_episim_output_zipped(directory, combined_info,"infections.txt.csv", c("date","nShowingSymptomsCumulative","nSusceptible","district"))
+
+berlin_incidence <- convert_infections_into_incidence(directory,berlin_raw,FALSE)
+
+berlin_incidence_filtered <- berlin_incidence %>% 
+  select(date, incidence, district) %>% 
+  mutate(scenario = "EpiSim") %>% 
+  rbind(rki_berlin %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Berlin")) %>% 
+  filter(date >= plot_start_date, date <= plot_end_date) %>% 
+  filter(lubridate::wday(date, label = TRUE)=="Thu")
+
+ggplot() +
+  geom_point(data = berlin_incidence_filtered,mapping = aes(date,incidence, col = scenario),show.legend = FALSE) + 
+  labs(title ="Incidence in Berlin only", subtitle = "Berlin + Brandenburg modelled as ABM") +
+  common_style
+```
+
 
 ## Combined: Berlin + Brandenburg
 ```{r}
 
-combined_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-11-11/1-both/"
+combined_directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-01-27/1-both-berBranOutput/"
 
 combined_districts <- c("Berlin", brand_districts)
 
@@ -163,13 +186,14 @@ combined_districts <- c("Berlin", brand_districts)
   # filter(thetaFactor == 0.7,pHouseholds == 0.0, workLeisureAdjustment == FALSE,importToBerlin == FALSE) 
 
 combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>% 
-  filter(thetaFactor %in% c(0.7),  workLeisureAdjustment == TRUE,importToBerlin == TRUE)
+  filter(thetaFactor %in% c(0.75),  workLeisureAdjustment == TRUE, importMultSpring == 0.25,importToBerlin == TRUE)
+
 # %>% 
   # filter(pHouseholds == 0.35, importMult == 2)
 
 # combined_info %>% view()
 
-combined_raw <- read_combine_episim_output(combined_directory, combined_info,"infections.txt",TRUE, c("date","nShowingSymptomsCumulative","nSusceptible","district")) 
+combined_raw <- read_combine_episim_output_zipped(combined_directory, combined_info,"infections.txt.csv", c("date","nShowingSymptomsCumulative","nSusceptible","district")) 
 
 
 
@@ -192,7 +216,7 @@ combined_filtered_combined <- combined_raw %>%
 combined_filtered <- rbind(combined_filtered_berlin, combined_filtered_brand, combined_filtered_combined)
 
 
-combined_incidence <- convert_infections_into_incidence(combined_directory,combined_filtered,TRUE)
+combined_incidence <- convert_infections_into_incidence(combined_directory,combined_filtered,FALSE)
 
 
 combined_incidence_filtered <- combined_incidence %>% 
@@ -212,7 +236,7 @@ combined_plot_combined <- ggplot() +
   labs(title ="Incidence in Berlin + Brandenburg", subtitle = "Berlin + Brandenburg modelled as ABM") +
   common_style
 
-# combined_plot_combined
+combined_plot_combined
 
 combined_plot_berlin <- ggplot() +
   geom_point(data = combined_incidence_filtered %>% filter(district == "Berlin"),mapping = aes(date,incidence, col = scenario),show.legend = FALSE) + 
@@ -226,15 +250,17 @@ combined_plot_brand <- ggplot() +
   labs(title ="Incidence in Brandenburg only", subtitle = "Berlin + Brandenburg modelled as ABM") +
   common_style
 
+combined_plot_brand
+
 
 # plot all three
 combined_plot <- combined_plot_combined / (combined_plot_brand | combined_plot_berlin)  + plot_annotation(tag_levels = 'a')
-# combined_plot
-# combined_plot
+combined_plot
+
 ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, width = 12, height = 8)
 
 
-ggplot(rki_berlin) + geom_point(aes(date,incidence), col = "red")
+# ggplot(rki_berlin) + geom_point(aes(date,incidence), col = "red")
 
 ```
 
@@ -246,14 +272,20 @@ what happens if I change the max outdoor fraction for this simulation also to 0.
 
 ```{r}
 
-brand_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-10-17/2-brand-quick/"
+# ggplot(bind_rows(rki_berlin %>% mutate(area = "berlin"),rki_brand %>% mutate(area = "brand")) %>% filter(date <= plot_end_date)) + geom_point(aes(date,incidence, col = area))
+ 
+# brand_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-10-17/2-brand-quick/"
 
+brand_directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-01-30/2-brand-R/"
+
+
+  # filter(thetaFactor %in% c(0.75),  workLeisureAdjustment == TRUE, importMultSpring == 0.25,importToBerlin == TRUE)
 
 brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>% 
-    filter(ode %in% c(1.0,4.0), thetaFactor == 0.7)
+    filter(ode %in% c(1.0), importMult %in% c(0.075,0.1,0.125,.25), importSummerOn == TRUE, thetaFactor == 0.75,workLeisureAdjustment == TRUE) #ode %in% c(1.0,4.0)
 
 
-brand_raw <- read_combine_episim_output(brand_directory,brand_info,"infections.txt",FALSE, c("date","nShowingSymptomsCumulative","nSusceptible","district"))
+brand_raw <- read_combine_episim_output_zipped(brand_directory,brand_info,"infections.txt.csv", c("date","nShowingSymptomsCumulative","nSusceptible","district"))
 
 brand_params <- get_run_parameters(brand_directory)
 
@@ -263,7 +295,7 @@ brand_filtered <- brand_raw %>%
   summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative), nSusceptible = sum(nSusceptible)) %>% 
   mutate(district = "Brandenburg")
 
-brand_incidence <- convert_infections_into_incidence(brand_directory,brand_filtered,TRUE)
+brand_incidence <- convert_infections_into_incidence(brand_directory,brand_filtered,FALSE)
 
 brand_incidence_filtered <- brand_incidence %>% 
   select(date, incidence) %>% 
