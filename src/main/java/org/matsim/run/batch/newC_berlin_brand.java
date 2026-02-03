@@ -88,7 +88,7 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.berlinBrandenburg)
 			.setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
 			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
-			.setWeatherModel(params == null || params.fallThreshold == 25.0 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_185_225)
+			.setWeatherModel(params == null || params.springThreshold == 18.5 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_200_250)
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
 			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
@@ -184,14 +184,17 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 		public double importMultSummer;
 
 
-		@StringParameter({"true", "false"}) // 2
+		@StringParameter({"true"}) // 1
 		public String workLeisureAdjustment;
 
-		@Parameter({0.8})
+		@Parameter({0.8, 1.0})
 		public double maxOutdoorFraction;
 
-		@Parameter({25.})
-		public double fallThreshold;
+		@Parameter({18.5, 20.0})
+		public double springThreshold;
+
+//		@Parameter({25.})
+//		public double fallThreshold;
 
 //		@Parameter({60, 75, 90, 105, 120}) //5
 //		public double hl;

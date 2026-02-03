@@ -86,7 +86,7 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.brandenburg)
 			.setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
 			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
-			.setWeatherModel(params == null || params.fallThreshold == 25.0 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_185_225)
+			.setWeatherModel(params == null || params.springThreshold == 18.5 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_200_250)
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
 			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
@@ -156,11 +156,11 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 
 		if (params.ode != -1.0) {
 
-			episimConfig.setInitialInfections(0);
+//			episimConfig.setInitialInfections(0);
 
-			for (NavigableMap<LocalDate, Integer> map : episimConfig.getInfections_pers_per_day().values()) {
-				map.clear();
-			}
+//			for (NavigableMap<LocalDate, Integer> map : episimConfig.getInfections_pers_per_day().values()) {
+//				map.clear();
+//			}
 
 			episimConfig.setOdeIncidenceFile(SnzBerlinProductionScenario.INPUT.resolve("ode_be_infectious_250211.csv").toString());
 
@@ -194,17 +194,17 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		@StringParameter({"x0.0","x0.075", "x0.1", "x0.125", "x0.25"}) //4
 		public String importMult;
 
-		@StringParameter({"true", "false"}) //3
+		@StringParameter({"true"}) //3
 		public String importSummerOn;
 
-		@StringParameter({"true", "false"}) // 2
+		@StringParameter({"true"}) // 2
 		public String workLeisureAdjustment;
 
-		@Parameter({0.8})
+		@Parameter({0.8, 1.0})
 		public double maxOutdoorFraction;
 
-		@Parameter({25.})
-		public double fallThreshold;
+		@Parameter({18.5, 20.0})
+		public double springThreshold;
 
 	}
 
