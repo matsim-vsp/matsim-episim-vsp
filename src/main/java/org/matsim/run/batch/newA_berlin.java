@@ -22,14 +22,10 @@ import java.util.*;
 
 
 /**
- * boilerplate batch for berlin
+ * berlin as ABM, Brandenburg as ODE
  */
 public class newA_berlin implements BatchRun<newA_berlin.Params> {
 
-	/*
-	 * here you can swap out vaccination model, antibody model, etc.
-	 * See CologneBMBF202310XX_soup.java for an example
-	 */
 	@Nullable
 	@Override
 	public Module getBindings(int id, @Nullable Params params) {
@@ -86,12 +82,15 @@ public class newA_berlin implements BatchRun<newA_berlin.Params> {
 	private SnzBerlinProductionScenario getBindings(Params params) {
 		return new SnzBerlinProductionScenario.Builder()
 			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.berlin)
+            .setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
+			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
+			.setWeatherModel(SnzProductionScenario.WeatherModel.midpoints_185_250)
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
+			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
 			.setChristmasModel(SnzBerlinProductionScenario.ChristmasModel.no)
-			.setSample(25)
-			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setOdeCoupling(params == null || params.ode != -1.0 ? SnzProductionScenario.OdeCoupling.yes : SnzProductionScenario.OdeCoupling.no)
+			.setSample(25)
 			.build();
 	}
 
@@ -129,15 +128,35 @@ public class newA_berlin implements BatchRun<newA_berlin.Params> {
 
 		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * params.thetaFactor);
 
+
+		double importMult = Double.parseDouble(params.importMult.replace("x", ""));
+		for (NavigableMap<LocalDate, Integer> dateToImportMap : episimConfig.getInfections_pers_per_day().values()) {
+
+			for(LocalDate date : dateToImportMap.keySet()) {
+
+//				dateToImportMap.put(date, (int) (dateToImportMap.get(date) * params.importMult));
+				if (date.isBefore(LocalDate.of(2020, 5, 1))) {
+					dateToImportMap.put(date, (int) (dateToImportMap.get(date) * importMult));
+				} else {
+					if (Objects.equals(params.importSummerOn, "true")) {
+						dateToImportMap.put(date, (int) (dateToImportMap.get(date) * importMult));
+					} else {
+						dateToImportMap.put(date, (int) (dateToImportMap.get(date) * 0.));
+					}
+				}
+			}
+
+		}
+
 		// ODE COUPLING
 
 		if (params.ode != -1.0) {
 
-			episimConfig.setInitialInfections(0);
+//			episimConfig.setInitialInfections(0);
 
-			for (NavigableMap<LocalDate, Integer> map : episimConfig.getInfections_pers_per_day().values()) {
-				map.clear();
-			}
+//			for (NavigableMap<LocalDate, Integer> map : episimConfig.getInfections_pers_per_day().values()) {
+//				map.clear();
+//			}
 
 			episimConfig.setOdeIncidenceFile(SnzBerlinProductionScenario.INPUT.resolve("ode_br_infectious_250212.csv").toString());
 			//		episimConfig.setOdeIncidenceFile(SnzBerlinProductionScenario.INPUT.resolve("ode_inputs/left_s.csv").toString());
@@ -160,17 +179,35 @@ public class newA_berlin implements BatchRun<newA_berlin.Params> {
 		@GenerateSeeds(5)
 		public long seed;
 
-		@Parameter({0.0, 0.1, 0.15, 0.2, 0.35, 0.5}) // 6
+		@Parameter({0.0})
 		public double pHouseholds;
 
-
-		//		@Parameter({.5,.6, .7, .8, .9, 1}) // 6
-		@Parameter({.5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1}) // 11
+		// CHOSEN PARAMS
+		@Parameter({.75}) // 3
+//		@Parameter({.7, .75, .8}) // 3
 		public double thetaFactor;
 
 		//		@Parameter({-1.0})
-		@Parameter({0.5, 0.75, 1.0, 2.0, 4.0})
+//		@Parameter({ 0.5,  0.75,  1.0, 1.5, 3.0})  //5
+		@Parameter({1.0})  //5
 		public double ode;
+
+//		@StringParameter({"x0.0","x0.075", "x0.1", "x0.125", "x0.25"}) //4
+		@StringParameter({"x0.1"}) //4
+		public String importMult;
+
+		@StringParameter({"true"}) //3
+		public String importSummerOn;
+
+		@StringParameter({"true"}) // 2
+		public String workLeisureAdjustment;
+
+//		@Parameter({0.8, 1.0})
+		@Parameter({1.0})
+		public double maxOutdoorFraction;
+
+		@Parameter({18.5})
+		public double springThreshold;
 
 	}
 

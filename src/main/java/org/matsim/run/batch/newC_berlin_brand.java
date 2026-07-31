@@ -169,15 +169,17 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 
 
 		//		@Parameter({.5,.6, .7, .8, .9, 1}) // 6
-		@Parameter({.5, .6, .65, .7, .75, .8, .85, .9,  1}) // 9
+//		@Parameter({.5, .6, .65, .7, .75, .8, .85, .9,  1}) // 9
+		@Parameter({.75}) // 9
 		public double thetaFactor;
 
 
-		@StringParameter({"true", "false"}) // 1
-//		@StringParameter({"false"})
+//		@StringParameter({"true", "false"}) // 1
+		@StringParameter({"false"})
 		public String importToBerlin;
 
-		@Parameter({0.25,0.5,.75, 1.0}) //4
+//		@Parameter({0.25,0.5,.75, 1.0}) //4
+		@Parameter({.25}) //4
 		public double importMultSpring;
 
 		@Parameter({1.0}) //3
@@ -187,10 +189,11 @@ public class newC_berlin_brand implements BatchRun<newC_berlin_brand.Params> {
 		@StringParameter({"true"}) // 1
 		public String workLeisureAdjustment;
 
-		@Parameter({0.8, 1.0})
+//		@Parameter({0.8, 1.0})
+		@Parameter({1.0})
 		public double maxOutdoorFraction;
 
-		@Parameter({18.5, 20.0})
+		@Parameter({18.5})
 		public double springThreshold;
 
 //		@Parameter({25.})

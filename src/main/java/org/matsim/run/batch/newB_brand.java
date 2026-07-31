@@ -184,14 +184,17 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		@Parameter({0.0})
 		public double pHouseholds;
 
-		@Parameter({.7, .75, .8}) // 3
+//		@Parameter({.7, .75, .8}) // 3
+		@Parameter({.75}) // 3
 		public double thetaFactor;
 
-		//		@Parameter({-1.0})
-		@Parameter({ 0.5,  0.75,  1.0, 1.5, 3.0})  //5
-		public double ode;
 
-		@StringParameter({"x0.0","x0.075", "x0.1", "x0.125", "x0.25"}) //4
+
+//		@Parameter({ 0.5,  0.75,  1.0, 1.5, 3.0})  //5
+		@Parameter({1.0})
+		public double ode;
+		//		@StringParameter({"x0.0","x0.075", "x0.1", "x0.125", "x0.25"}) //4
+		@StringParameter({"x0.1"}) //4
 		public String importMult;
 
 		@StringParameter({"true"}) //3
@@ -200,10 +203,11 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		@StringParameter({"true"}) // 2
 		public String workLeisureAdjustment;
 
-		@Parameter({0.8, 1.0})
+//		@Parameter({0.8,  1.0})
+		@Parameter({1.0})
 		public double maxOutdoorFraction;
 
-		@Parameter({18.5, 20.0})
+		@Parameter({18.5})
 		public double springThreshold;
 
 	}
