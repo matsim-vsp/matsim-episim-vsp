@@ -17,6 +17,7 @@ library(tmap)
 library(tmaptools)
 library(scales)
 library(gganimate)
+library(purrr)
 
 source("masterJR-utils.R")
 ```
@@ -102,7 +103,9 @@ rki2  <- read_csv(tmpfile)
 
 rki2_brand <- rki2 %>% filter(Bundesland_id == "12") %>% filter(Altersgruppe == "00+")
 
-ode_incidence_brandenburg <- read_csv("/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input/ode_br_infectious_250212.csv") %>%
+ode_incidence_brandenburg <- 
+  # read_csv("../shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input/ode_br_infectious_250212.csv") %>%
+  read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/ode_br_infectious_250212.csv") %>%
   mutate(new_infections = infectious / 3 * POPULATION_BRANDENBURG  ) %>% 
   mutate(incidence = rollsum(new_infections, 7, fill = NA, align = "right")/ POPULATION_BRANDENBURG * 100000)
 
@@ -117,7 +120,9 @@ ggplot(rki_brand %>% filter(wday(date) ==5)) + geom_point(aes(date,incidence))  
 
 rki2_berlin <- rki2 %>% filter(Bundesland_id == "11") %>% filter(Altersgruppe == "00+")
 
-ode_incidence_berlin <- read_csv("/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/ode_be_infectious_250211.csv") %>%
+ode_incidence_berlin <- 
+  # read_csv("../shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/ode_be_infectious_250211.csv") %>%
+    read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/ode_be_infectious_250211.csv") %>%
   mutate(new_infections = infectious / 3 * POPULATION_BRANDENBURG  ) %>% 
   mutate(incidence = rollsum(new_infections, 7, fill = NA, align = "right")/ POPULATION_BRANDENBURG * 100000)
 
@@ -134,7 +139,7 @@ Setup
 
 ```{r}
 
-image_output_path <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/images/"
+image_output_path <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/images/"
 
 common_style <- list(
   scale_color_manual(values = c("RKI" = "darkorange","EpiSim" = "blue")),
@@ -155,14 +160,15 @@ common_style <- list(
 ## Combined: Berlin + Brandenburg
 ```{r}
 
-combined_directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/1-both-br/"
+
+# the "-br" in the directory means that we filter the outputs to only include landkreise in brandenburg. This is a bit different to what is shown on covid-sim, where I believe the incidence of the entire study area (berlin, brand, and other bundesländer) is shown. 
+combined_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/1-both-br/"
 
 
 combined_districts <- c("Berlin", brand_districts)
 
-# combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>%
-  # filter(thetaFactor == 0.7,pHouseholds == 0.0, workLeisureAdjustment == FALSE,importToBerlin == FALSE) 
 
+# these are the settings we've chosen for our paper!
 combined_info <- read_delim(paste0(combined_directory, "_info.txt"), delim = ";") %>% 
     filter(thetaFactor %in% c(0.75), maxOutdoorFraction == 1.0, importMultSpring %in% c(0.25),importToBerlin == FALSE)
 
@@ -206,8 +212,6 @@ combined_incidence_filtered <- combined_incidence %>%
   filter(date >= plot_start_date, date <= plot_end_date) %>% 
   filter(lubridate::wday(date, label = TRUE)=="Thu")
 
-# ggplot(combined_incidence_filtered %>% filter(scenario !="RKI")) + geom_point(aes(date,incidence, col = district))
-  
 
 combined_plot_combined <- ggplot() +
   geom_point(data = combined_incidence_filtered %>% filter(district == "Combined"),mapping = aes(date,incidence, col = scenario)) + 
@@ -245,19 +249,14 @@ ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, w
 
 ## Brandenburg
 
-what happens if I change the max outdoor fraction for this simulation also to 0.8, then there will be more infections in the summer! 
-
 
 ```{r}
 
-# ggplot(bind_rows(rki_berlin %>% mutate(area = "berlin"),rki_brand %>% mutate(area = "brand")) %>% filter(date <= plot_end_date)) + geom_point(aes(date,incidence, col = area))
- 
-# brand_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2025-10-17/2-brand-quick/"
+
 
 brand_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-br/"
 
 
-  # filter(thetaFactor %in% c(0.75),  workLeisureAdjustment == TRUE, importMultSpring == 0.25,importToBerlin == TRUE)
 
 brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>% 
     filter(ode %in% c(1.0), importMult %in% c("x0.1"), maxOutdoorFraction == 1.0,thetaFactor == 0.75,workLeisureAdjustment == TRUE) #ode %in% c(1.0,4.0) #,"x0.075","x0.1","x0.125"
@@ -296,7 +295,7 @@ ggsave(paste0(image_output_path,"results_brand.pdf"), plot = brand_plot, width =
 
 ```{r}
 
-berlin_directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/3-berlin/"
+berlin_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/3-berlin/"
 
 berlin_info <- read_delim(paste0(berlin_directory, "_info.txt"), delim = ";") %>% 
     filter(ode %in% c(1.0), importMult %in% c("x0.1"), maxOutdoorFraction == 1.0, thetaFactor == 0.75,workLeisureAdjustment == TRUE) #ode %in% c(1.0,4.0) #,"x0.075","x0.1","x0.125"
@@ -338,19 +337,19 @@ ggsave(paste0(image_output_path,"results_berlin.pdf"), plot = berlin_plot, width
 
 # brand_directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-br-disagg/2-brand/"
 
-brand_directory <- "/Users/jakob/Dropbox/Documents/04_Work-VSP/007_papers/2025-08-14-abm-coupling/Data4Paper/2-brand/"
+brand_directory_loc <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-loc/"
 
-berlin_brandenburg_envelope <- st_read("/Users/jakob/Dropbox/Documents/04_Work-VSP/SHAPE_FILES/berlinBrandenburg/berlinBrandenburg.shp") %>% st_transform(4236)
+berlin_brandenburg_envelope <- st_read("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/berlinBrandenburgShp/berlinBrandenburg.shp") %>% st_transform(4236)
 
 # plot infection map
-info_df <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";")
+info_df <- read_delim(paste0(brand_directory_loc, "_info.txt"), delim = ";")
 
 
 info_df %>% pull(seed) %>% unique() %>% as.character()
 runId <- info_df %>% filter(seed == 7564655870752978944) %>% filter(ode %in% c(1.0), importMult %in% c("x0.1"), maxOutdoorFraction == 1.0,thetaFactor == 0.75,workLeisureAdjustment == TRUE) %>% pull(RunId)
 
 
-geospatial <- read_delim(paste0(brand_directory,runId,".infectionLoc.csv")) %>%
+geospatial <- read_delim(paste0(brand_directory_loc,runId,".infectionLoc.csv")) %>%
   st_as_sf(coords = c("home_lon","home_lat"), crs = 4236) %>%
   st_filter(berlin_brandenburg_envelope) %>%   
   mutate(infection_type = factor(infection_type, levels = c("normal","import"),labels = c("ABM Infections","ODE Import"))) %>% 
@@ -421,17 +420,17 @@ tmap_animation(tmap_for_video,filename = paste0(image_output_path, "map.mp4"))
 
 
 
-## 2026-03-02
+# Correlation Analysis
 
 
 ```{r}
 
 
-shp_lk <- st_read("/Users/jakob/Dropbox/Documents/04_Work-VSP/SHAPE_FILES/landkreise-DE/landkreise-in-germany.shp") %>% filter(name_1 == "Brandenburg") %>% select(district = name_2)
+shp_lk <- st_read("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/landkreise-DE/landkreise-in-germany.shp") %>% filter(name_1 == "Brandenburg") %>% select(district = name_2)
 
 
-flows <- read_csv("/Users/jakob/git/matsim-episim-vsp/flows.csv")
-pop <- read_csv("/Users/jakob/git/matsim-episim-vsp/pop.csv")
+flows <- read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/flows.csv")
+pop <- read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/pop.csv")
 
 rel_districts = c("Berlin",brand_districts)
 
@@ -473,49 +472,6 @@ brand_lk_incidence_max_2 <- brand_lk_incidence %>%
   filter(date > ymd("2020-06-01")) %>% 
   summarise(max_incidence_2 = max(incidence), max_date_2 = date[which.max(incidence)],total_cases_2 = sum(infections))  %>% 
   mutate(max_day_2 = as.numeric(max_date_2 - ymd("2020-02-25")))
-
-
-# tmap_mode("plot")
-# #cols4all::c4a_gui() to choose color scheme
-# tm_basemap("Esri.WorldGrayCanvas") + 
-#   tm_shape(brand_lk_incidence_max_1) + 
-#   tm_polygons(fill = "max_incidence", fill.scale = tm_scale_continuous(values = "brewer.or_rd")) +
-#   tm_title("Max Incidence")
-
-
-# df_template <- data.frame(
-#   district = c(
-#     "Barnim",
-#     "Brandenburg an der Havel",
-#     "Cottbus",
-#     "Dahme-Spreewald",
-#     "Elbe-Elster",
-#     "Frankfurt (Oder)",
-#     "Havelland",
-#     "Märkisch-Oderland",
-#     "Oberhavel",
-#     "Oberspreewald-Lausitz",
-#     "Oder-Spree",
-#     "Ostprignitz-Ruppin",
-#     "Potsdam",
-#     "Potsdam-Mittelmark",
-#     "Prignitz",
-#     "Spree-Neiße",
-#     "Teltow-Fläming",
-#     "Uckermark"
-#   ),
-#   commuters = c(
-#     31195, 2535, 1738, 25317,934, 1896,
-#     25023, 28179, 36866, 1018, 14381, 2770,
-#     20307,22957, 805, 989 , 22235, 2582
-#   )
-# ) %>% inner_join(shp_lk) %>% st_as_sf()
-# 
-# tm_basemap("Esri.WorldGrayCanvas") + 
-#   tm_shape(df_template) + 
-#   tm_polygons(fill = "commuters") +
-#   tm_title("# of Commuters")
-# 
 
 
 ```
@@ -628,9 +584,7 @@ tmap_save(cor10_total_cases_wave2, "figures/cor10_total_cases_wave2.png")
 
 
 ```{r}
-library(dplyr)
-library(tidyr)
-library(purrr)
+
 
 # vars_x <- c("commuters_total", "commuter_relative", "pop", "pop_density")
 vars_x <- c("commuter_relative", "pop_density")
@@ -659,114 +613,5 @@ result <- pairs %>%
   select(var1, var2, correlation, p_value, corr_rounded)
 
 result
-```
-
-# DEPRECATED
-```{r}
-### MAX WAVE HEIGHT
-# 1st Wave - max wave height 
-# no correlation Commuters -> Incidence:  -0.06574884 ->  -0.0259287
-cor(merged$commuters_total,merged$max_incidence_1)
-
-# no correlation Relative Commuters -> Incidence:  0.03138117 -> 0.0349035
-cor(merged$commuter_relative,merged$max_incidence_1)
-
-# a bit correlation Population -> Incidence: -0.2914974 -> no change
-cor(merged$pop,merged$max_incidence_1)
-
-# positive correlation 0.5235667 -> no change
-cor(merged$pop_density,merged$max_incidence_1)
-
-
-# 2nd Wave
-# no correlation Commuters -> Incidence:  -0.01679962
-cor(merged$commuters_total,merged$max_incidence_2)
-
-# no correlation Relative Commuters -> Incidence:  0.02488187
-cor(merged$commuter_relative,merged$max_incidence_2)
-
-# a bit correlation Population -> Incidence: -0.2333074
-cor(merged$pop,merged$max_incidence_2)
-
-# positive correlation 0.3811721
-cor(merged$pop_density,merged$max_incidence_2)
-
-
-### Date of Max Wave
-# 1st Wave 
-# some correlation Commuters -> Date:  -0.4129234
-# cor(merged$commuters_total,merged$max_day_1)
-
-# some correlation Relative Commuters -> Date:  -0.424026
-cor(merged$commuter_relative,merged$max_day_1)
-
-# negative correlation Population -> Date:-0.4307691
-# cor(merged$pop,merged$max_day_1)
-
-# negative correlation -0.2520205
-cor(merged$pop_density,merged$max_day_1)
-
-
-# 2nd Wave 
-# some correlation Commuters -> Date:  -0.0494883
-cor(merged$commuters_total,merged$max_day_2)
-
-# some correlation Relative Commuters -> Date:  -0.03293716
-cor(merged$commuter_relative,merged$max_day_2)
-
-# a bit correlation Population -> Date: 0.04996071
-cor(merged$pop,merged$max_day_2)
-
-# negative correlation: 0.1319583
-cor(merged$pop_density,merged$max_day_2)
-
-
-### Total Number of Infections
-# 1st Wave 
-# cor(merged$commuters_total,merged$total_cases_1)
-
-# some correlation Relative Commuters
-cor(merged$commuter_relative,merged$total_cases_1)
-
-# negative correlation Population -> 
-# cor(merged$pop,merged$total_cases_1)
-
-# negative correlation
-cor(merged$pop_density,merged$total_cases_1)
-
-
-# 2nd Wave 
-# some correlation Commuters -> 
-# cor(merged$commuters_total,merged$total_cases_2)
-
-# some correlation Relative Commuters ->
-cor(merged$commuter_relative,merged$total_cases_2)
-
-# a bit correlation Population ->
-# cor(merged$pop,merged$total_cases_2)
-
-# negative correlation:
-cor(merged$pop_density,merged$total_cases_2)
-
-# merged %>% view()
-```
-
-
-```{r}
-
-merged %>% ggplot() + geom_point(aes(pop_density,total_cases_1))
-merged %>% ggplot() + geom_point(aes(pop_density,max_incidence_1))
-merged %>% ggplot() + geom_point(aes(pop_density,max_date_1))
-```
-
-
-```{r}
-berlin <- read.delim("/Users/jakob/berlin.txt")
-brand <- read.delim("/Users/jakob/brand.txt")
-both <- read.delim("/Users/jakob/both.txt")
-
-brand %>% filter(district == "total" & date == "2021-02-23") %>% pull(nShowingSymptomsCumulative)
-both %>%  filter(district == "total" & date == "2021-02-23") %>% pull(nShowingSymptomsCumulative)
-berlin %>% filter(district == "total" & date == "2021-02-23") %>% pull(nShowingSymptomsCumulative)
 ```
 
