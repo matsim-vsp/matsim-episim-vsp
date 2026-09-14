@@ -89,9 +89,11 @@ rki_combined<- rbind(rki_brand, rki_berlin) %>% group_by(date) %>%
 
 
 ```
+
 plausibility checks
 
 It seems that inan used the ReferenzDatum. So I will use this for now as well
+
 ```{r}
 tmpfile <- tempfile(fileext = ".csv")
 download.file("https://raw.githubusercontent.com/robert-koch-institut/COVID-19_7-Tage-Inzidenz_in_Deutschland/refs/heads/main/COVID-19-Faelle_7-Tage-Inzidenz_Bundeslaender.csv", tmpfile, mode = "wb")
@@ -102,7 +104,6 @@ rki2  <- read_csv(tmpfile)
 # Plausibility of Brandenburg
 
 rki2_brand <- rki2 %>% filter(Bundesland_id == "12") %>% filter(Altersgruppe == "00+")
-
 ode_incidence_brandenburg <- 
   # read_csv("../shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input/ode_br_infectious_250212.csv") %>%
   read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/ode_br_infectious_250212.csv") %>%
@@ -142,22 +143,22 @@ Setup
 image_output_path <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/images/"
 
 common_style <- list(
-  scale_color_manual(values = c("RKI" = "darkorange","EpiSim" = "blue")),
+  scale_color_manual(values = c("Data (RKI)" = "#005EB8","Model" = "#B87200")),
+  scale_fill_manual(values = c("Data (RKI)" = "#FFFFFF","Model" = "#FFFFFF")),
   scale_x_date(
     date_breaks = "1 month",
     date_labels = "%b\n'%y"
   ),
   scale_y_log10(limits = c(0.1,1000), labels = label_number()),
-  theme_minimal(base_size = 14),
+  theme_minimal(base_size = 18),
   theme(legend.position = "bottom"),
-  labs(x = "Date", y = "SARS-CoV-2 Incidence", col = NULL)
+  labs(x = "Date", y = "COVID-19 incidence\nper 100,000", col = NULL)
 )
 
 ```
 
-
-
 ## Combined: Berlin + Brandenburg
+
 ```{r}
 
 
@@ -202,41 +203,50 @@ combined_filtered <- rbind(combined_filtered_berlin, combined_filtered_brand, co
 
 combined_incidence <- convert_infections_into_incidence(combined_directory,combined_filtered,FALSE)
 
-
 combined_incidence_filtered <- combined_incidence %>% 
   select(date, incidence, district) %>% 
-  mutate(scenario = "EpiSim") %>% 
-  rbind(rki_combined %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Combined")) %>% 
-  rbind(rki_berlin %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Berlin")) %>% 
-  rbind(rki_brand %>% select(date, incidence = incidence) %>% mutate(scenario = "RKI",district = "Brandenburg")) %>% 
+  mutate(scenario = "Model") %>% 
+  rbind(rki_combined %>% select(date, incidence = incidence) %>% mutate(scenario = "Data (RKI)",district = "Combined")) %>% 
+  rbind(rki_berlin %>% select(date, incidence = incidence) %>% mutate(scenario = "Data (RKI)",district = "Berlin")) %>% 
+  rbind(rki_brand %>% select(date, incidence = incidence) %>% mutate(scenario = "Data (RKI)",district = "Brandenburg")) %>% 
   filter(date >= plot_start_date, date <= plot_end_date) %>% 
-  filter(lubridate::wday(date, label = TRUE)=="Thu")
+  group_by(scenario) %>% 
+  mutate(incidence_smooth = rollmean(incidence, k = 7, fill = NA, align = "center")) %>%
+  filter(lubridate::wday(date, label = TRUE)=="Thu") %>%
+  ungroup()
 
-
-combined_plot_combined <- ggplot() +
-  geom_point(data = combined_incidence_filtered %>% filter(district == "Combined"),mapping = aes(date,incidence, col = scenario)) + 
+combined_plot_combined <- ggplot(data = combined_incidence_filtered %>% filter(district == "Combined"), aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+  geom_line(data = subset(combined_incidence_filtered, scenario == "Model"), size = 1) +
+  geom_point(size = 1.5, show.legend = FALSE) +  
+  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
   labs(title ="Incidence in Berlin + Brandenburg", subtitle = "Berlin + Brandenburg modelled as ABM") +
-  common_style
+  common_style +
+  guides(color = guide_legend(override.aes = list(shape = c(2, 17))))
 
 combined_plot_combined
 
-combined_plot_berlin <- ggplot() +
-  geom_point(data = combined_incidence_filtered %>% filter(district == "Berlin"),mapping = aes(date,incidence, col = scenario),show.legend = FALSE) + 
-  labs(title ="Incidence in Berlin only", subtitle = "Berlin + Brandenburg modelled as ABM") +
-  common_style
+combined_plot_berlin <- ggplot(data = combined_incidence_filtered %>% filter(district == "Berlin"), aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+  geom_line(data = subset(combined_incidence_filtered, scenario == "Model"), size = 1) +
+  geom_point(size = 1.5) +  
+  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  labs(title ="Incidence in Berlin", subtitle = "Berlin + Brandenburg modelled as ABM") +
+  common_style + guides(color = guide_legend(override.aes = list(shape = c(2, 17))))
 
 combined_plot_berlin
 
-combined_plot_brand <- ggplot() +
-  geom_point(data = combined_incidence_filtered %>% filter(district == "Brandenburg"), mapping = aes(date,incidence, col = scenario), show.legend = FALSE) + 
-  labs(title ="Incidence in Brandenburg only", subtitle = "Berlin + Brandenburg modelled as ABM") +
-  common_style
+combined_plot_brand <- ggplot(data = combined_incidence_filtered %>% filter(district == "Brandenburg"), aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+  geom_line(data = subset(combined_incidence_filtered, scenario == "Model"), size = 1) +
+  geom_point(size = 1.5) +  
+  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  labs(title ="Incidence in Brandenburg", subtitle = "Berlin + Brandenburg modelled as ABM") +
+  guides(color = guide_legend(override.aes = list(shape = c(2, 17)))) +
+  common_style 
 
 combined_plot_brand
 
 
 # plot all three
-combined_plot <- combined_plot_combined / (combined_plot_brand | combined_plot_berlin)  + plot_annotation(tag_levels = 'a')
+combined_plot <- combined_plot_combined / (combined_plot_brand | combined_plot_berlin)  + plot_annotation(tag_levels = 'A')
 # combined_plot
 
 ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, width = 12, height = 8)
@@ -246,14 +256,9 @@ ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, w
 
 ```
 
-
 ## Brandenburg
 
-
 ```{r}
-
-
-
 brand_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-br/"
 
 
@@ -276,14 +281,18 @@ brand_incidence <- convert_infections_into_incidence(brand_directory,brand_filte
 
 brand_incidence_filtered <- brand_incidence %>% 
   select(date, incidence) %>% 
-  mutate(scenario = "EpiSim") %>% 
-  rbind(rki_brand %>% select(date, incidence) %>% mutate(scenario = "RKI")) %>% 
+  mutate(scenario = "Model") %>% 
+  rbind(rki_brand %>% select(date, incidence) %>% mutate(scenario = "Data (RKI)")) %>% 
   filter(date >= plot_start_date, date <= plot_end_date) %>% 
+    mutate(incidence_smooth = rollmean(incidence, k = 7, fill = NA, align = "center")) %>%
   filter(lubridate::wday(date, label = TRUE)=="Thu")
 
-brand_plot <- ggplot() +
-  geom_point(data = brand_incidence_filtered, mapping = aes(date,incidence, col = scenario)) +
-  labs(title ="Incidence in Brandenburg", subtitle = "Coupled Model: Brandenburg as ABM | Berlin as ODE") + 
+brand_plot <- ggplot(data = brand_incidence_filtered, aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+  geom_line(data = subset(brand_incidence_filtered, scenario == "Model"), size = 1) +
+  geom_point(size = 1.5, show.legend = FALSE) +  
+  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  labs(title ="Urban-driven scenario\n(Brandenburg incidence)") + 
+  guides(color = guide_legend(override.aes = list(shape = c(2, 17)))) +
   common_style
 
 brand_plot
@@ -310,26 +319,42 @@ berlin_incidence <- convert_infections_into_incidence(berlin_directory,berlin_fi
 
 berlin_incidence_filtered <-  berlin_incidence %>% 
   # mutate(scenario = paste0("EpiSim:",thetaFactor)) %>% 
-    mutate(scenario = "EpiSim") %>%
+    mutate(scenario = "Model") %>%
   select(date, incidence, scenario) %>% 
-  rbind(rki_berlin %>% select(date, incidence) %>% mutate(scenario = "RKI")) %>% 
+  rbind(rki_berlin %>% select(date, incidence) %>% mutate(scenario = "Data (RKI)")) %>% 
   filter(date >= plot_start_date, date <= plot_end_date) %>% 
+    mutate(incidence_smooth = rollmean(incidence, k = 7, fill = NA, align = "center")) %>%
   filter(lubridate::wday(date, label = TRUE)=="Thu")
 
-berlin_plot <- ggplot() +
-  geom_point(data = berlin_incidence_filtered,mapping = aes(date,incidence, col = scenario)) + 
-  labs(title ="Incidence in Berlin", subtitle = "Coupled Model: Berlin as ABM | Brandenburg as ODE") +
-  common_style 
+berlin_plot <- ggplot(data = berlin_incidence_filtered, aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+  geom_line(data = subset(berlin_incidence_filtered, scenario == "Model"), size = 1) +
+  geom_point(size = 1.5, show.legend = FALSE) +  
+  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  labs(title ="Rural-driven scenario\n(Berlin incidence)") + 
+  guides(color = guide_legend(override.aes = list(shape = c(2, 17)))) +
+  common_style +
+    theme(axis.title.y = element_blank(),
+        axis.text.y  = element_blank(),
+        axis.ticks.y = element_blank())
+  
     # scale_color_manual(values = c("RKI" = "red","EpiSim:1" = "grey", setNames("black", paste0("EpiSim:", THETA_FACTOR)))) 
 
 berlin_plot
 
 ggsave(paste0(image_output_path,"results_berlin.pdf"), plot = berlin_plot, width = 6, height = 4)
 
+combined_plot <- ggpubr::ggarrange(brand_plot, berlin_plot,
+          ncol = 2, nrow = 1,
+          common.legend = TRUE,
+          legend = "bottom",
+          labels = c("A", "B"),
+          font.label = list(size = 20, face = "bold"), 
+          widths = c(1.2, 1))
+
+ggsave(paste0(image_output_path,"results_scenariocomparison.pdf"), plot = combined_plot, width = 12, height = 4)
+
+
 ```
-
-
-
 
 # Geospatial & Temporal Analysis
 
@@ -418,10 +443,7 @@ tmap_animation(tmap_for_video,filename = paste0(image_output_path, "map.mp4"))
 
 ```
 
-
-
 # Correlation Analysis
-
 
 ```{r}
 
@@ -449,9 +471,8 @@ flow_and_commuters <- pop2 %>%
 
 ```
 
-
-
 Linking commuter flows to incidence
+
 ```{r}
 
 brand_lk_filtered <- brand_raw %>% 
@@ -477,6 +498,7 @@ brand_lk_incidence_max_2 <- brand_lk_incidence %>%
 ```
 
 Merge
+
 ```{r}
 merged <- flow_and_commuters %>%
   full_join(brand_lk_incidence_max_1, by =  "district") %>%
@@ -582,7 +604,6 @@ tmap_save(cor9_total_cases_wave1, "figures/cor9_total_cases_wave1.png")
 tmap_save(cor10_total_cases_wave2, "figures/cor10_total_cases_wave2.png")
 ```
 
-
 ```{r}
 
 
@@ -614,4 +635,3 @@ result <- pairs %>%
 
 result
 ```
-
