@@ -175,9 +175,9 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 
 
 		if (params.commuterQuarantineScope.equals("all")) {
-			episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("CommuterAll.csv").toString());
+			episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("br_interregional-travllers-ids__act-all.csv").toString());
 		} else if (params.commuterQuarantineScope.equals("work")) {
-			episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("CommuterWork.csv").toString());
+			episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("br_interregional-travllers-ids__act-work.csv").toString());
 		} else {
 			throw new RuntimeException("Invalid Option");
 		}

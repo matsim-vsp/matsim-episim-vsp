@@ -14,7 +14,10 @@ import org.matsim.core.population.io.PopulationReader;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.facilities.ActivityFacility;
 import org.matsim.facilities.MatsimFacilitiesReader;
+import org.matsim.scenarioCreation.DistrictLookup;
 import org.matsim.run.modules.SnzBerlinProductionScenario;
+import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import java.io.File;
 import tech.tablesaw.api.LongColumn;
 import tech.tablesaw.api.StringColumn;
 import tech.tablesaw.api.Table;
@@ -24,188 +27,232 @@ import java.util.*;
 
 public class CommuterAnalysis {
 
-	private static final String BRANDENBURG_INPUT =
-		"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/";
+	enum SpatialSystem{landkreis, gemeinde}
+
+	enum ActType {all, work}
+
+	/** Person counts unique visitors; trip counts activity starts, both relative to home. */
+	enum FlowType {person, trip}
+
+	private static final String GEMEINDE_SHP = "/Users/jakob/git/_SHAPE_FILES/gemeinden-DE-bkg-2023/vg5000_ebenen_1231/VG5000_GEM.shp";
+
+//	private static final String SCENARIO_INPUT = "/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/";
+	private static final String SCENARIO_INPUT = "/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/";
+//	private static final String SCENARIO_PREFIX = "br";
+	private static final String SCENARIO_PREFIX = "bb";
 	private static final String[] INPUT_EVENT_FILES = {
-		BRANDENBURG_INPUT + "br_2020-week_snz_episim_events_wt_25pt_split.xml.gz",
-		BRANDENBURG_INPUT + "br_2020-week_snz_episim_events_sa_25pt_split.xml.gz",
-		BRANDENBURG_INPUT + "br_2020-week_snz_episim_events_so_25pt_split.xml.gz"
+		SCENARIO_INPUT + SCENARIO_PREFIX + "_2020-week_snz_episim_events_wt_25pt_split.xml.gz",
+		SCENARIO_INPUT + SCENARIO_PREFIX + "_2020-week_snz_episim_events_sa_25pt_split.xml.gz",
+		SCENARIO_INPUT + SCENARIO_PREFIX + "_2020-week_snz_episim_events_so_25pt_split.xml.gz"
 	};
-	private static final String INPUT_FACILITIES_FILE =
-		BRANDENBURG_INPUT + "br_2020-week_snz_episim_facilities_withDistricts_25pt.xml.gz";
-	private static final String INPUT_POPULATION_FILE =
-		BRANDENBURG_INPUT + "br_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz";
-	private static final String OUTPUT_COMMUTER_ALL_FILE = BRANDENBURG_INPUT + "CommuterAll.csv";
-	private static final String OUTPUT_COMMUTER_WORK_FILE = BRANDENBURG_INPUT + "CommuterWork.csv";
+	private static final String INPUT_FACILITIES_FILE = SCENARIO_INPUT + SCENARIO_PREFIX +"_2020-week_snz_episim_facilities_withDistricts_25pt.xml.gz";
+	private static final String INPUT_POPULATION_FILE = SCENARIO_INPUT +SCENARIO_PREFIX + "_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz";
+
+
+	private static final String OUTPUT_TRAVELLER_IDS_PREFIX = SCENARIO_INPUT + SCENARIO_PREFIX + "_interregional-travllers-ids__act-";
 
 	public static void main(String[] args) throws IOException {
-
-
-		// BerlinBrandenburg
-//		List<String> inputEventFiles = List.of(
-//			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_wt_25pt_split.xml.gz",
-//			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_sa_25pt_split.xml.gz",
-//			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_so_25pt_split.xml.gz"
-//		);
-//
-//		String inputFacilitiesFile = "../shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_facilities_withDistricts_25pt.xml.gz";
-//		String inputPopulationFile = "../shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz";
-
-
-		// Brandenburg
 		Scenario scenario = ScenarioUtils.createScenario(ConfigUtils.createConfig());
-
 		new MatsimFacilitiesReader(scenario).readFile(INPUT_FACILITIES_FILE);
-
 		new PopulationReader(scenario).readFile(INPUT_POPULATION_FILE);
 
+		EventsManager events = EventsUtils.createEventsManager();
+		Map<String, CommuterEventHandler> handlers = new LinkedHashMap<>();
+		for (SpatialSystem spatialSystem : SpatialSystem.values()) {
+			// SNZ coordinates are UTM32; the supplied VG5000 shapefile uses GK3.
+			DistrictLookup.Index municipalities = spatialSystem == SpatialSystem.gemeinde
+				? new DistrictLookup.Index(new File(GEMEINDE_SHP),
+					TransformationFactory.getCoordinateTransformation("EPSG:25832", "EPSG:31467"), "AGS")
+				: null;
+			Map<Id<Person>, String> homeRegions = new HashMap<>();
+			Map<String, Long> populationCounts = new TreeMap<>();
+			long unmatchedHomes = 0;
+			for (Person person : scenario.getPopulation().getPersons().values()) {
+				String region = municipalities == null
+					? (String) person.getAttributes().getAttribute("district")
+					: lookup(municipalities, person.getAttributes().getAttribute("homeX"),
+						person.getAttributes().getAttribute("homeY"));
+				if (region == null) {
+					unmatchedHomes++;
+					continue;
+				}
+				homeRegions.put(person.getId(), region);
+				populationCounts.merge(region, 1L, Long::sum);
+			}
 
-		// POPULATION CNT
-
-		Map<String, Long> district2cnt = new HashMap<>();
-
-		for (Person person : scenario.getPopulation().getPersons().values()) {
-			String district = person.getAttributes().getAttribute("district").toString();
-			district2cnt.merge(district, 1L, Long::sum);
+			StringColumn regionColumn = StringColumn.create(spatialSystem.toString());
+			LongColumn populationColumn = LongColumn.create("cnt");
+			populationCounts.forEach((region, count) -> {
+				regionColumn.append(region);
+				populationColumn.append(count);
+			});
+			Table.create("population", regionColumn, populationColumn).write().csv(SCENARIO_INPUT + SCENARIO_PREFIX + "_population__" + spatialSystem + ".csv");
+			System.out.printf("%s: unmatched homes: %d%n", spatialSystem, unmatchedHomes);
+			Map<Id<ActivityFacility>, String> facilityRegions = new HashMap<>();
+			for (ActType actType : ActType.values()) {
+				for (FlowType flowType : FlowType.values()) {
+					CommuterEventHandler handler = new CommuterEventHandler(
+						scenario, homeRegions, municipalities, actType, flowType);
+					// Resolve each facility once per spatial system; collect the ID lists only once.
+					handler.facilityRegions = facilityRegions;
+					handler.collectCommuterIds = handlers.isEmpty();
+					String output = SCENARIO_INPUT + SCENARIO_PREFIX + "_interregional-travellers-OD__act-"
+						+ actType + "__flow-" + flowType + "__" + spatialSystem + ".csv";
+					handlers.put(output, handler);
+					events.addHandler(handler);
+				}
+			}
 		}
 
-		StringColumn homeCol = StringColumn.create("district");
-		LongColumn popCnt = LongColumn.create("cnt");
-
-		district2cnt.forEach((from, cnt) -> {
-			homeCol.append(from);
-			popCnt.append(cnt);
-		});
-
-		Table t1 = Table.create("pop", homeCol, popCnt);
-//		t1.write().csv("pop.csv");
-
-
-		// EVENTS
-
-
-
-		//create an event object
-		EventsManager events = EventsUtils.createEventsManager();
-
-		//create the handler and add it
-		CommuterEventHandler handler1 = new CommuterEventHandler(scenario);
-		events.addHandler(handler1);
-
-		//create the reader and read the file
 		events.initProcessing();
 		MatsimEventsReader reader = new MatsimEventsReader(events);
-		for(String inputFile : INPUT_EVENT_FILES){
-			reader.readFile(inputFile);
-		}
+		for (String inputFile : INPUT_EVENT_FILES) reader.readFile(inputFile);
 		events.finishProcessing();
-
-		StringColumn fromCol = StringColumn.create("from");
-		StringColumn toCol = StringColumn.create("to");
-		LongColumn cntCol = LongColumn.create("cnt");
-
-		handler1.from2to2cnt.forEach((from, inner) -> {
-			inner.forEach((to, cnt) -> {
-				fromCol.append(from);
-				toCol.append(to);
-				cntCol.append(cnt);
-			});
-		});
-
-		Table t = Table.create("flows", fromCol, toCol, cntCol);
-//		t.write().csv("flows.csv");
-
-
-		Set<Id<Person>> commutersAllActs = new HashSet<>(handler1.agentsWithActsInBrand);
-		commutersAllActs.retainAll(handler1.agentsWithActsInBerlin);
-
-		Table commuterAllTable = Table.create("commuters", StringColumn.create("commuters", commutersAllActs.stream().map(Object::toString)));
-		commuterAllTable.write().csv(OUTPUT_COMMUTER_ALL_FILE);
-
-		System.out.println("Travelers btwn Berlin and Brandenburg (for any activity): " + commutersAllActs.size());
-
-
-
-		Set<Id<Person>> berlinToBrandCommutersWork = new HashSet<>(handler1.agentsHomeInBerlin);
-		berlinToBrandCommutersWork.retainAll(handler1.agentsWorkInBrand);
-
-		Set<Id<Person>> brandToBerlinCommutersWork = new HashSet<>(handler1.agentsHomeInBrand);
-		brandToBerlinCommutersWork.retainAll(handler1.agentsWorkInBerlin);
-
-		Set<Id<Person>> commutersWork = new HashSet<>(berlinToBrandCommutersWork);
-		commutersWork.addAll(brandToBerlinCommutersWork);
-
-		Table commuterWorkTable = Table.create("commuters", StringColumn.create("commuters", commutersWork.stream().map(Object::toString)));
-		commuterWorkTable.write().csv(OUTPUT_COMMUTER_WORK_FILE);
-
-
-		System.out.println("Commuters btwn Berlin and Brandenburg (for work): " + commutersWork.size());
-
-
-
+		CommuterEventHandler idHandler = handlers.values().iterator().next();
+		for (ActType type : ActType.values()) {
+			Table.create("commuters", StringColumn.create("commuters",
+				idHandler.commuterIds(type).stream().map(Object::toString).sorted()))
+				.write().csv(OUTPUT_TRAVELLER_IDS_PREFIX + type + ".csv");
+		}
+		for (Map.Entry<String, CommuterEventHandler> entry : handlers.entrySet()) {
+			writeFlows(entry.getKey(), entry.getValue());
+			System.out.printf("%s: skipped unresolved activity events: %d%n",
+				entry.getKey(), entry.getValue().unmatchedEvents);
+		}
 	}
 
-	public static class CommuterEventHandler implements org.matsim.api.core.v01.events.handler.ActivityStartEventHandler, ActivityEndEventHandler {
+	private static void writeFlows(String outputFile, CommuterEventHandler handler) throws IOException {
+		StringColumn fromColumn = StringColumn.create("from");
+		StringColumn toColumn = StringColumn.create("to");
+		LongColumn countColumn = LongColumn.create("cnt");
+		handler.from2to2cnt.forEach((from, destinations) -> destinations.forEach((to, count) -> {
+			fromColumn.append(from);
+			toColumn.append(to);
+			countColumn.append(count);
+		}));
+		Table.create("travellers", fromColumn, toColumn, countColumn).write().csv(outputFile);
+	}
+
+	private static String lookup(DistrictLookup.Index index, Object x, Object y) {
+		if (!(x instanceof Number) || !(y instanceof Number)) return null;
+		try {
+			return index.query(((Number) x).doubleValue(), ((Number) y).doubleValue());
+		} catch (NoSuchElementException e) {
+			// Generalized municipality boundaries do not necessarily cover every input coordinate.
+			return null;
+		}
+	}
+
+	/**
+	 * Counts home-to-activity flows across all input days without weekday weighting.
+	 * Trip mode counts activity starts, not legs between successive activity locations.
+	 */
+	public static class CommuterEventHandler implements
+		org.matsim.api.core.v01.events.handler.ActivityStartEventHandler, ActivityEndEventHandler {
 
 		private final Scenario scenario;
+		private final Map<Id<Person>, String> homeRegions;
+		private final DistrictLookup.Index municipalities;
+		private final ActType selectedActType;
+		private final FlowType selectedFlowType;
+		private Map<Id<ActivityFacility>, String> facilityRegions = new HashMap<>();
+		private final Map<Id<Person>, Set<String>> visitedRegions = new HashMap<>();
+		final Map<String, Map<String, Long>> from2to2cnt = new TreeMap<>();
+		private long unmatchedEvents;
+		private boolean collectCommuterIds = true;
+		// Bit 1 = Berlin, bit 2 = Brandenburg. Independent of flow resolution and mode.
+		private final Map<Id<Person>, Integer> activitySides = new HashMap<>();
+		private final Map<Id<Person>, Integer> homeSides = new HashMap<>();
+		private final Map<Id<Person>, Integer> workSides = new HashMap<>();
 
-		Set<Id<Person>> agentsWithActsInBerlin = new HashSet<>();
-		Set<Id<Person>> agentsWithActsInBrand = new HashSet<>();
+		Set<Id<Person>> commuterIds(ActType type) {
+			Set<Id<Person>> result = new HashSet<>();
+			activitySides.forEach((person, sides) -> {
+				int home = homeSides.getOrDefault(person, 0);
+				int work = workSides.getOrDefault(person, 0);
+				if (type == ActType.all ? sides == 3
+					: ((home & 1) != 0 && (work & 2) != 0) || ((home & 2) != 0 && (work & 1) != 0)) {
+					result.add(person);
+				}
+			});
+			return result;
+		}
 
-		Set<Id<Person>> agentsHomeInBerlin = new HashSet<>();
-		Set<Id<Person>> agentsHomeInBrand = new HashSet<>();
-		Set<Id<Person>> agentsWorkInBerlin = new HashSet<>();
-		Set<Id<Person>> agentsWorkInBrand = new HashSet<>();
+		private void collectCommuter(Id<Person> person, Id<ActivityFacility> facilityId, String activityType) {
+			if (!collectCommuterIds) return;
+			ActivityFacility facility = findFacility(facilityId);
+			if (facility == null) return;
+			Object district = facility.getAttributes().getAttribute("district");
+			int side = "Berlin".equals(district) ? 1
+				: district != null && SnzBerlinProductionScenario.BRANDENBURG_LANDKREISE.contains(district) ? 2 : 0;
+			if (side == 0) return;
+			activitySides.merge(person, side, (a, b) -> a | b);
+			if ("home".equals(activityType)) homeSides.merge(person, side, (a, b) -> a | b);
+			if ("work".equals(activityType)) workSides.merge(person, side, (a, b) -> a | b);
+		}
 
-
-
-		Map<String, Map<String, Long>> from2to2cnt = new HashMap<>();
-
-		public CommuterEventHandler(Scenario scenario) {
+		CommuterEventHandler(Scenario scenario, Map<Id<Person>, String> homeRegions,
+			DistrictLookup.Index municipalities, ActType selectedActType, FlowType selectedFlowType) {
 			this.scenario = scenario;
+			this.homeRegions = homeRegions;
+			this.municipalities = municipalities;
+			this.selectedActType = selectedActType;
+			this.selectedFlowType = selectedFlowType;
 		}
 
 		@Override
 		public void handleEvent(ActivityEndEvent event) {
-
+			if (selectedFlowType == FlowType.trip) {
+				collectCommuter(event.getPersonId(), event.getFacilityId(), event.getActType());
+				return;
+			}
 			processEvent(event.getPersonId(), event.getFacilityId(), event.getActType());
 		}
 
 		@Override
 		public void handleEvent(ActivityStartEvent event) {
-
 			processEvent(event.getPersonId(), event.getFacilityId(), event.getActType());
 		}
 
-		public void processEvent(Id<Person> personId, Id<ActivityFacility> facilityId, String actType){
-			try {
-				Id<ActivityFacility> cleanedFacilityId = Id.create(facilityId.toString().replace("home_", "").replaceAll("_split.", ""), ActivityFacility.class);
-				String district = scenario.getActivityFacilities().getFacilities().get(cleanedFacilityId).getAttributes().getAttribute("district").toString();
-				assignToBerlinOrBrand(personId, district, actType);
-			} catch (Exception e) {
-				System.out.println("Failed for " + personId + " - " + actType);
+		public void processEvent(Id<Person> personId, Id<ActivityFacility> facilityId, String activityType) {
+			collectCommuter(personId, facilityId, activityType);
+			if (selectedActType == ActType.work && !"work".equals(activityType)) return;
+			String from = homeRegions.get(personId);
+			String to = facilityRegion(facilityId);
+			if (from == null || to == null) {
+				unmatchedEvents++;
+				return;
+			}
+			if (!from.equals(to) && (selectedFlowType == FlowType.trip
+				|| visitedRegions.computeIfAbsent(personId, ignored -> new HashSet<>()).add(to))) {
+				from2to2cnt.computeIfAbsent(from, ignored -> new TreeMap<>()).merge(to, 1L, Long::sum);
 			}
 		}
 
-		private void assignToBerlinOrBrand( Id<Person> person, String district, String actType) {
-			if (district.equals("Berlin")) {
-				agentsWithActsInBerlin.add(person);
-				if (actType.equals("home")) {
-					agentsHomeInBerlin.add(person);
-				} else if (actType.equals("work")) {
-					agentsWorkInBerlin.add(person);
-				}
-			} else if (SnzBerlinProductionScenario.BRANDENBURG_LANDKREISE.contains(district)) {
-				agentsWithActsInBrand.add(person);
-				if (actType.equals("home")) {
-					agentsHomeInBrand.add(person);
-				} else if (actType.equals("work")) {
-					agentsWorkInBrand.add(person);
-				}
+		private ActivityFacility findFacility(Id<ActivityFacility> id) {
+			if (id == null) return null;
+			ActivityFacility facility = scenario.getActivityFacilities().getFacilities().get(id);
+			if (facility == null) {
+				String cleaned = id.toString().replaceFirst("^home_", "").replaceFirst("_split\\..*$", "");
+				facility = scenario.getActivityFacilities().getFacilities().get(Id.create(cleaned, ActivityFacility.class));
 			}
+			return facility;
+		}
+
+		private String facilityRegion(Id<ActivityFacility> id) {
+			if (id == null) return null;
+			ActivityFacility facility = findFacility(id);
+			if (facility != null) id = facility.getId();
+			if (!facilityRegions.containsKey(id)) {
+				String region = null;
+				if (facility != null) {
+					if (municipalities == null) region = (String) facility.getAttributes().getAttribute("district");
+					else if (facility.getCoord() != null) region = lookup(municipalities,
+						facility.getCoord().getX(), facility.getCoord().getY());
+				}
+				facilityRegions.put(id, region);
+			}
+			return facilityRegions.get(id);
 		}
 	}
-
-
-
 }

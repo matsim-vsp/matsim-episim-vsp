@@ -444,6 +444,79 @@ tmap_animation(tmap_for_video,filename = paste0(image_output_path, "map.mp4"))
 
 # Correlation Analysis
 
+Infections by Gemeinden
+```{r}
+# Use the same municipality boundaries and AGS identifiers as CommuterAnalysis.
+shp_gemeinde <- st_read(
+  "/Users/jakob/git/_SHAPE_FILES/gemeinden-DE-bkg-2023/vg5000_ebenen_1231/VG5000_GEM.shp",
+  quiet = TRUE
+) %>%
+  filter(SN_L == "12") %>%
+  transmute(gemeinde = as.character(AGS), gemeinde_name = GEN) %>%
+  group_by(gemeinde, gemeinde_name) %>%
+  summarise(.groups = "drop")
+
+# Both infections and population refer to the 25% sample: no factor of four needed.
+brand_gemeinde_population <- read_csv(
+  "/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/br_population__gemeinde.csv",
+  col_types = cols(gemeinde = col_character(), cnt = col_double())
+) %>%
+  rename(population = cnt) %>%
+  inner_join(st_drop_geometry(shp_gemeinde), by = "gemeinde") %>%
+  filter(population > 0)
+
+stopifnot(length(runId) == 1, nrow(brand_gemeinde_population) > 0)
+brand_gemeinde_locations <- read_csv(
+  paste0(brand_directory_loc, runId, ".infectionLoc.csv"),
+  show_col_types = FALSE
+)
+# Retain the simulation start date used in the geospatial analysis above.
+gemeinde_start_date <- ymd("2020-03-20")
+gemeinde_dates <- seq(gemeinde_start_date,
+                      gemeinde_start_date + max(brand_gemeinde_locations$daysSinceStart),
+                      by = "day")
+
+brand_gemeinde_infections <- brand_gemeinde_locations %>%
+  filter(is.finite(home_lon), is.finite(home_lat)) %>%
+  st_as_sf(coords = c("home_lon", "home_lat"), crs = 4326) %>%
+  st_transform(st_crs(shp_gemeinde)) %>%
+  st_join(shp_gemeinde %>% select(gemeinde), join = st_within, left = TRUE) %>%
+  st_drop_geometry()
+
+# Unmatched points include Berlin/outside Brandenburg and gaps in generalized borders.
+message("Infections outside the Brandenburg Gemeinde polygons: ",
+        sum(is.na(brand_gemeinde_infections$gemeinde)))
+stopifnot(nrow(brand_gemeinde_infections) ==
+            sum(is.finite(brand_gemeinde_locations$home_lon) &
+                  is.finite(brand_gemeinde_locations$home_lat)))
+
+brand_gemeinde_daily <- brand_gemeinde_infections %>%
+  filter(!is.na(gemeinde)) %>%
+  mutate(date = gemeinde_start_date + daysSinceStart) %>%
+  count(gemeinde, date, name = "infections")
+
+# Analogous to brand_lk_incidence: trailing seven days per 100,000 residents.
+# These are infection events (normal + import), not symptom onsets as in the LK helper.
+# Complete the daily grid, including municipalities with no infections.
+brand_gemeinde_incidence <- crossing(
+  gemeinde = brand_gemeinde_population$gemeinde, date = gemeinde_dates
+) %>%
+  left_join(brand_gemeinde_daily, by = c("gemeinde", "date")) %>%
+  mutate(infections = replace_na(infections, 0L)) %>%
+  left_join(brand_gemeinde_population, by = "gemeinde") %>%
+  arrange(gemeinde, date) %>%
+  group_by(gemeinde) %>%
+  mutate(
+    nInfectedCumulative = cumsum(infections),
+    infections_week = nInfectedCumulative - lag(nInfectedCumulative, n = 7, default = 0),
+    incidence = infections_week / population * 100000
+  ) %>%
+  ungroup() %>%
+  mutate(RunId = runId) %>%
+  arrange(date, gemeinde)
+```
+
+
 ```{r}
 
 
