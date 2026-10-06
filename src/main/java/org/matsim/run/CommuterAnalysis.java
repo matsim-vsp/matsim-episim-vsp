@@ -12,9 +12,9 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.population.io.PopulationReader;
 import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.facilities.ActivityFacility;
 import org.matsim.facilities.MatsimFacilitiesReader;
 import org.matsim.run.modules.SnzBerlinProductionScenario;
-import tech.tablesaw.api.IntColumn;
 import tech.tablesaw.api.LongColumn;
 import tech.tablesaw.api.StringColumn;
 import tech.tablesaw.api.Table;
@@ -24,14 +24,40 @@ import java.util.*;
 
 public class CommuterAnalysis {
 
+	private static final String BRANDENBURG_INPUT =
+		"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/";
+	private static final String[] INPUT_EVENT_FILES = {
+		BRANDENBURG_INPUT + "br_2020-week_snz_episim_events_wt_25pt_split.xml.gz",
+		BRANDENBURG_INPUT + "br_2020-week_snz_episim_events_sa_25pt_split.xml.gz",
+		BRANDENBURG_INPUT + "br_2020-week_snz_episim_events_so_25pt_split.xml.gz"
+	};
+	private static final String INPUT_FACILITIES_FILE =
+		BRANDENBURG_INPUT + "br_2020-week_snz_episim_facilities_withDistricts_25pt.xml.gz";
+	private static final String INPUT_POPULATION_FILE =
+		BRANDENBURG_INPUT + "br_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz";
+	private static final String OUTPUT_COMMUTER_ALL_FILE = BRANDENBURG_INPUT + "CommuterAll.csv";
+	private static final String OUTPUT_COMMUTER_WORK_FILE = BRANDENBURG_INPUT + "CommuterWork.csv";
 
 	public static void main(String[] args) throws IOException {
 
+
+		// BerlinBrandenburg
+//		List<String> inputEventFiles = List.of(
+//			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_wt_25pt_split.xml.gz",
+//			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_sa_25pt_split.xml.gz",
+//			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_so_25pt_split.xml.gz"
+//		);
+//
+//		String inputFacilitiesFile = "../shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_facilities_withDistricts_25pt.xml.gz";
+//		String inputPopulationFile = "../shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz";
+
+
+		// Brandenburg
 		Scenario scenario = ScenarioUtils.createScenario(ConfigUtils.createConfig());
 
-		new MatsimFacilitiesReader(scenario).readFile("/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_facilities_withDistricts_25pt.xml.gz");
+		new MatsimFacilitiesReader(scenario).readFile(INPUT_FACILITIES_FILE);
 
-		new PopulationReader(scenario).readFile("/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_entirePopulation_emptyPlans_withDistricts_25pt_split.xml.gz");
+		new PopulationReader(scenario).readFile(INPUT_POPULATION_FILE);
 
 
 		// POPULATION CNT
@@ -52,16 +78,12 @@ public class CommuterAnalysis {
 		});
 
 		Table t1 = Table.create("pop", homeCol, popCnt);
-		t1.write().csv("pop.csv");
+//		t1.write().csv("pop.csv");
 
 
 		// EVENTS
 
-		List<String> inputFiles = List.of(
-			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_wt_25pt_split.xml.gz",
-			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_sa_25pt_split.xml.gz",
-			"/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/BerlinBrandenburg/episim-input/bb_2020-week_snz_episim_events_so_25pt_split.xml.gz"
-		);
+
 
 		//create an event object
 		EventsManager events = EventsUtils.createEventsManager();
@@ -73,7 +95,7 @@ public class CommuterAnalysis {
 		//create the reader and read the file
 		events.initProcessing();
 		MatsimEventsReader reader = new MatsimEventsReader(events);
-		for(String inputFile : inputFiles){
+		for(String inputFile : INPUT_EVENT_FILES){
 			reader.readFile(inputFile);
 		}
 		events.finishProcessing();
@@ -91,16 +113,34 @@ public class CommuterAnalysis {
 		});
 
 		Table t = Table.create("flows", fromCol, toCol, cntCol);
-		t.write().csv("flows.csv");
+//		t.write().csv("flows.csv");
 
 
-		Set<Id<Person>> commuters = new HashSet<>(handler1.agentsWithActsInBrand);
-		commuters.retainAll(handler1.agentsWithActsInBerlin);
+		Set<Id<Person>> commutersAllActs = new HashSet<>(handler1.agentsWithActsInBrand);
+		commutersAllActs.retainAll(handler1.agentsWithActsInBerlin);
 
-		Table commuterT = Table.create("commuters", StringColumn.create("commuters", commuters.stream().map(Object::toString)));
-		commuterT.write().csv("commuters.csv");
+		Table commuterAllTable = Table.create("commuters", StringColumn.create("commuters", commutersAllActs.stream().map(Object::toString)));
+		commuterAllTable.write().csv(OUTPUT_COMMUTER_ALL_FILE);
 
-		System.out.println();
+		System.out.println("Travelers btwn Berlin and Brandenburg (for any activity): " + commutersAllActs.size());
+
+
+
+		Set<Id<Person>> berlinToBrandCommutersWork = new HashSet<>(handler1.agentsHomeInBerlin);
+		berlinToBrandCommutersWork.retainAll(handler1.agentsWorkInBrand);
+
+		Set<Id<Person>> brandToBerlinCommutersWork = new HashSet<>(handler1.agentsHomeInBrand);
+		brandToBerlinCommutersWork.retainAll(handler1.agentsWorkInBerlin);
+
+		Set<Id<Person>> commutersWork = new HashSet<>(berlinToBrandCommutersWork);
+		commutersWork.addAll(brandToBerlinCommutersWork);
+
+		Table commuterWorkTable = Table.create("commuters", StringColumn.create("commuters", commutersWork.stream().map(Object::toString)));
+		commuterWorkTable.write().csv(OUTPUT_COMMUTER_WORK_FILE);
+
+
+		System.out.println("Commuters btwn Berlin and Brandenburg (for work): " + commutersWork.size());
+
 
 
 	}
@@ -112,6 +152,12 @@ public class CommuterAnalysis {
 		Set<Id<Person>> agentsWithActsInBerlin = new HashSet<>();
 		Set<Id<Person>> agentsWithActsInBrand = new HashSet<>();
 
+		Set<Id<Person>> agentsHomeInBerlin = new HashSet<>();
+		Set<Id<Person>> agentsHomeInBrand = new HashSet<>();
+		Set<Id<Person>> agentsWorkInBerlin = new HashSet<>();
+		Set<Id<Person>> agentsWorkInBrand = new HashSet<>();
+
+
 
 		Map<String, Map<String, Long>> from2to2cnt = new HashMap<>();
 
@@ -121,56 +167,41 @@ public class CommuterAnalysis {
 
 		@Override
 		public void handleEvent(ActivityEndEvent event) {
-			if (event.getActType().equals("home")) {
-				String home = scenario.getPopulation().getPersons().get(event.getPersonId()).getAttributes().getAttribute("district").toString();
-				assignToBerlinOrBrand(event.getPersonId(), home);
-			} else {
-				try  {
-					String district = scenario.getActivityFacilities().getFacilities().get(event.getFacilityId()).getAttributes().getAttribute("district").toString();
-					assignToBerlinOrBrand(event.getPersonId(), district);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}			}
 
+			processEvent(event.getPersonId(), event.getFacilityId(), event.getActType());
 		}
-
 
 		@Override
 		public void handleEvent(ActivityStartEvent event) {
-			if (event.getActType().equals("home")) {
-				String home = scenario.getPopulation().getPersons().get(event.getPersonId()).getAttributes().getAttribute("district").toString();
-				assignToBerlinOrBrand(event.getPersonId(), home);
-			} else {
 
-				try  {
-					String district = scenario.getActivityFacilities().getFacilities().get(event.getFacilityId()).getAttributes().getAttribute("district").toString();
-					assignToBerlinOrBrand(event.getPersonId(), district);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-
-			if(Objects.equals(event.getActType(), "work")) {
-
-				try {
-					String home = scenario.getPopulation().getPersons().get(event.getPersonId()).getAttributes().getAttribute("district").toString();
-					String district = scenario.getActivityFacilities().getFacilities().get(event.getFacilityId()).getAttributes().getAttribute("district").toString();
-
-					from2to2cnt
-						.computeIfAbsent(home, k -> new HashMap<>())
-						.merge(district, 1L, Long::sum);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-
+			processEvent(event.getPersonId(), event.getFacilityId(), event.getActType());
 		}
 
-		private void assignToBerlinOrBrand( Id<Person> person ,String district) {
+		public void processEvent(Id<Person> personId, Id<ActivityFacility> facilityId, String actType){
+			try {
+				Id<ActivityFacility> cleanedFacilityId = Id.create(facilityId.toString().replace("home_", "").replaceAll("_split.", ""), ActivityFacility.class);
+				String district = scenario.getActivityFacilities().getFacilities().get(cleanedFacilityId).getAttributes().getAttribute("district").toString();
+				assignToBerlinOrBrand(personId, district, actType);
+			} catch (Exception e) {
+				System.out.println("Failed for " + personId + " - " + actType);
+			}
+		}
+
+		private void assignToBerlinOrBrand( Id<Person> person, String district, String actType) {
 			if (district.equals("Berlin")) {
 				agentsWithActsInBerlin.add(person);
+				if (actType.equals("home")) {
+					agentsHomeInBerlin.add(person);
+				} else if (actType.equals("work")) {
+					agentsWorkInBerlin.add(person);
+				}
 			} else if (SnzBerlinProductionScenario.BRANDENBURG_LANDKREISE.contains(district)) {
 				agentsWithActsInBrand.add(person);
+				if (actType.equals("home")) {
+					agentsHomeInBrand.add(person);
+				} else if (actType.equals("work")) {
+					agentsWorkInBrand.add(person);
+				}
 			}
 		}
 	}

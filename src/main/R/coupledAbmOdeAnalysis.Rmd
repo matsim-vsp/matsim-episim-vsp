@@ -258,9 +258,8 @@ brand_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/j
 
 
 
-brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>% 
+brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>%
     filter(ode %in% c(1.0), importMult %in% c("x0.1"), maxOutdoorFraction == 1.0,thetaFactor == 0.75,workLeisureAdjustment == TRUE) #ode %in% c(1.0,4.0) #,"x0.075","x0.1","x0.125"
-
 
 brand_raw <- read_combine_episim_output_zipped(brand_directory,brand_info,"infections.txt.csv", c("date","nShowingSymptomsCumulative","nSusceptible","district"))
 

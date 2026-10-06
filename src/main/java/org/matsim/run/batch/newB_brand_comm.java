@@ -24,7 +24,7 @@ import java.util.*;
 /**
  * brandenburg scenario
  */
-public class newB_brand implements BatchRun<newB_brand.Params> {
+public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 
 
 	@Nullable
@@ -62,7 +62,7 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 				// designates a 35% of households  as super safe; the susceptibility of that subpopulation is reduced to 1% wrt to general population.
 				bind(HouseholdSusceptibility.Config.class).toInstance(
 					HouseholdSusceptibility.newConfig()
-						.withSusceptibleHouseholds(params.pHouseholds, 0.01)
+						.withSusceptibleHouseholds(0.0, 0.01)
 //								.withNonVaccinableHouseholds(params.nonVaccinableHh)
 //								.withShape(SnzCologneProductionScenario.INPUT.resolve("CologneDistricts.zip"))
 //								.withFeature("STT_NAME", vingst, altstadtNord, bickendorf, weiden)
@@ -84,9 +84,9 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 	private SnzBerlinProductionScenario getBindings(Params params) {
 		return new SnzBerlinProductionScenario.Builder()
 			.setBerlinBrandenburgInput(SnzBerlinProductionScenario.BerlinBrandenburgInput.brandenburg)
-			.setWorkLeisureAdjustment(params == null || Objects.equals(params.workLeisureAdjustment, "true"))
-			.setMaxOutdoorFraction(params == null ? 1.0 : params.maxOutdoorFraction)
-			.setWeatherModel(params == null || params.springThreshold == 18.5 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_200_250)
+			.setWorkLeisureAdjustment(params == null || Objects.equals("true", "true"))
+			.setMaxOutdoorFraction(1.0)
+			.setWeatherModel(params == null || 18.5 == 18.5 ? SnzProductionScenario.WeatherModel.midpoints_185_250 : SnzProductionScenario.WeatherModel.midpoints_200_250)
 			.setActivityHandling(EpisimConfigGroup.ActivityHandling.startOfDay)
 			.setInfectionModel(InfectionModelWithAntibodies.class)
 			.setEasterModel(SnzBerlinProductionScenario.EasterModel.no)
@@ -129,9 +129,9 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		// 		 2a: general episim config
 		EpisimConfigGroup episimConfig = ConfigUtils.addOrGetModule(config, EpisimConfigGroup.class);
 
-		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * params.thetaFactor);
+		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * 0.75);
 
-		double importMult = Double.parseDouble(params.importMult.replace("x", ""));
+		double importMult = Double.parseDouble("x0.1".replace("x", ""));
 		for (NavigableMap<LocalDate, Integer> dateToImportMap : episimConfig.getInfections_pers_per_day().values()) {
 
 			for(LocalDate date : dateToImportMap.keySet()) {
@@ -140,7 +140,7 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 				if (date.isBefore(LocalDate.of(2020, 5, 1))) {
 					dateToImportMap.put(date, (int) (dateToImportMap.get(date) * importMult));
 				} else {
-					if (Objects.equals(params.importSummerOn, "true")) {
+					if (Objects.equals("true", "true")) {
 						dateToImportMap.put(date, (int) (dateToImportMap.get(date) * importMult));
 					} else {
 						dateToImportMap.put(date, (int) (dateToImportMap.get(date) * 0.));
@@ -171,7 +171,16 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		}
 
 		episimConfig.setCommuterQuarantineMode(params.commuterQuarantineMode);
-		episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("commuters.csv").toString());
+//		episimConfig.setCommuterQuarantineMode(SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode.COMMUTERS);
+
+
+		if (params.commuterQuarantineScope.equals("all")) {
+			episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("CommuterAll.csv").toString());
+		} else if (params.commuterQuarantineScope.equals("work")) {
+			episimConfig.setCommuterQuarantineInput(SnzBerlinProductionScenario.INPUT.resolve("CommuterWork.csv").toString());
+		} else {
+			throw new RuntimeException("Invalid Option");
+		}
 		episimConfig.setCommuterQuarantineDate(params.commuterQuarantineDate);
 		episimConfig.setCommuterQuarantineShare(params.commuterQuarantineShare);
 
@@ -187,42 +196,24 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 		@GenerateSeeds(5)
 		public long seed;
 
-		@Parameter({0.0})
-		public double pHouseholds;
-
-//		@Parameter({.7, .75, .8}) // 3
-		@Parameter({.75}) // 3
-		public double thetaFactor;
-
 
 
 //		@Parameter({ 0.5,  0.75,  1.0, 1.5, 3.0})  //5
 		@Parameter({1.0})
 		public double ode;
-		//		@StringParameter({"x0.0","x0.075", "x0.1", "x0.125", "x0.25"}) //4
-		@StringParameter({"x0.1"}) //4
-		public String importMult;
 
-		@StringParameter({"true"}) //3
-		public String importSummerOn;
-
-		@StringParameter({"true"}) // 2
-		public String workLeisureAdjustment;
-
-//		@Parameter({0.8,  1.0})
-		@Parameter({1.0})
-		public double maxOutdoorFraction;
-
-		@Parameter({18.5})
-		public double springThreshold;
 
 		@EnumParameter(SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode.class)
 		public SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode commuterQuarantineMode;
 
-		@StringParameter({"2020-02-28","2020-10-01", "2020-11-01","2020-12-01"})
+		@StringParameter({"2020-03-01", "2020-04-01", "2020-05-01","2020-06-01","2020-07-01","2020-08-01","2020-09-01","2020-10-01", "2020-11-01","2020-12-01","2021-01-01","2021-02-01"})
 		public String commuterQuarantineDate;
 
+		@StringParameter({"all","work"})
+		public String commuterQuarantineScope;
+
 		@Parameter({0.25, 0.5, .75, 1.0})
+//		@Parameter({ 1.0})
 		public double commuterQuarantineShare;
 
 	}
@@ -234,7 +225,7 @@ public class newB_brand implements BatchRun<newB_brand.Params> {
 	 */
 	public static void main(String[] args) {
 		String[] args2 = {
-				RunParallel.OPTION_SETUP, newB_brand.class.getName(),
+				RunParallel.OPTION_SETUP, newB_brand_comm.class.getName(),
 				RunParallel.OPTION_PARAMS, Params.class.getName(),
 				RunParallel.OPTION_TASKS, Integer.toString(1),
 				RunParallel.OPTION_ITERATIONS, Integer.toString(50),
