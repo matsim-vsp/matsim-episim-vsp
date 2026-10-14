@@ -2,6 +2,16 @@ package org.matsim.run.batch;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
+import com.google.inject.Provides;
+import com.google.inject.Singleton;
+import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.population.Person;
+import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.scenarioCreation.DistrictLookup;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.function.BiFunction;
 import com.google.inject.multibindings.Multibinder;
 import com.google.inject.util.Modules;
 import org.matsim.core.config.Config;
@@ -30,7 +40,19 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 	@Nullable
 	@Override
 	public Module getBindings(int id, @Nullable Params params) {
-		return Modules.override(getBindings(params)).with(new AbstractModule() {
+		SnzBerlinProductionScenario base = getBindings(params);
+		return Modules.override(base).with(new AbstractModule() {
+			@Provides
+			@Singleton
+			public Scenario scenario(Config config) throws IOException {
+				Scenario scenario = base.scenario(config);
+				Path shape = SnzBerlinProductionScenario.INPUT.resolve("shape-File/VG5000_GEM.shp");
+				DistrictLookup.Index index = new DistrictLookup.Index(shape.toFile(),
+					TransformationFactory.getCoordinateTransformation("EPSG:25832", "EPSG:31467"), "AGS");
+				assignGemeinden(scenario, index::query);
+				return scenario;
+			}
+
 			@Override
 			protected void configure() {
 				// ANTIBODY MODEL
@@ -75,6 +97,28 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 
 
 		});
+	}
+
+
+
+	static void assignGemeinden(Scenario scenario, BiFunction<Double, Double, String> lookup) {
+		long unmatched = 0;
+		for (Person person : scenario.getPopulation().getPersons().values()) {
+			Object x = person.getAttributes().getAttribute("homeX");
+			Object y = person.getAttributes().getAttribute("homeY");
+			String gemeinde = null;
+			if (x instanceof Number && y instanceof Number) {
+				try {
+					gemeinde = lookup.apply(((Number) x).doubleValue(), ((Number) y).doubleValue());
+				} catch (NoSuchElementException e) {
+					// Generalized boundaries can leave home coordinates outside all polygons.
+				}
+			}
+			if (gemeinde == null) unmatched++;
+			person.getAttributes().putAttribute("gemeinde", gemeinde == null ? "unknown" : gemeinde);
+		}
+		System.out.printf("Gemeinde reporting: %d persons assigned, %d unmatched homes%n",
+			scenario.getPopulation().getPersons().size() - unmatched, unmatched);
 	}
 
 
@@ -128,6 +172,9 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 		// Level 2: Episim specific configs:
 		// 		 2a: general episim config
 		EpisimConfigGroup episimConfig = ConfigUtils.addOrGetModule(config, EpisimConfigGroup.class);
+
+		// Adds the full Gemeinde report without enabling location-based restrictions.
+		episimConfig.setDistrictLevelRestrictionsAttribute("gemeinde");
 
 		episimConfig.setCalibrationParameter(1.0e-05 * 0.83 * 0.75);
 

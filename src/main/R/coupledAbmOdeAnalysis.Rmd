@@ -20,6 +20,13 @@ library(gganimate)
 library(purrr)
 
 source("masterJR-utils.R")
+
+# Data and generated outputs use only these three roots.
+analysis_20260203 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/"
+analysis_20261006 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-10-06/"
+analysis_shared <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-JR-IB-SP/"
+
+
 ```
 
 Some Defaults and chosen values
@@ -105,8 +112,7 @@ rki2  <- read_csv(tmpfile)
 
 rki2_brand <- rki2 %>% filter(Bundesland_id == "12") %>% filter(Altersgruppe == "00+")
 ode_incidence_brandenburg <- 
-  # read_csv("../shared-svn/projects/episim/matsim-files/snz/BerlinV2/episim-input/ode_br_infectious_250212.csv") %>%
-  read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/ode_br_infectious_250212.csv") %>%
+  read_csv(paste0(analysis_shared, "misc/ode_br_infectious_250212.csv")) %>%
   mutate(new_infections = infectious / 3 * POPULATION_BRANDENBURG  ) %>% 
   mutate(incidence = rollsum(new_infections, 7, fill = NA, align = "right")/ POPULATION_BRANDENBURG * 100000)
 
@@ -122,8 +128,7 @@ ggplot(rki_brand %>% filter(wday(date) ==5)) + geom_point(aes(date,incidence))  
 rki2_berlin <- rki2 %>% filter(Bundesland_id == "11") %>% filter(Altersgruppe == "00+")
 
 ode_incidence_berlin <- 
-  # read_csv("../shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/ode_be_infectious_250211.csv") %>%
-    read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/ode_be_infectious_250211.csv") %>%
+    read_csv(paste0(analysis_shared, "misc/ode_be_infectious_250211.csv")) %>%
   mutate(new_infections = infectious / 3 * POPULATION_BRANDENBURG  ) %>% 
   mutate(incidence = rollsum(new_infections, 7, fill = NA, align = "right")/ POPULATION_BRANDENBURG * 100000)
 
@@ -140,7 +145,8 @@ Setup
 
 ```{r}
 
-image_output_path <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/images/"
+image_output_path <- paste0(analysis_shared, "images/")
+dir.create(image_output_path, recursive = TRUE, showWarnings = FALSE)
 
 common_style <- list(
   scale_color_manual(values = c("Data (RKI)" = "#005EB8","Model" = "#B87200")),
@@ -163,7 +169,7 @@ common_style <- list(
 
 
 # the "-br" in the directory means that we filter the outputs to only include landkreise in brandenburg. This is a bit different to what is shown on covid-sim, where I believe the incidence of the entire study area (berlin, brand, and other bundesländer) is shown. 
-combined_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/1-both-br/"
+combined_directory <- paste0(analysis_20260203, "1-both-br/")
 
 
 combined_districts <- c("Berlin", brand_districts)
@@ -256,10 +262,22 @@ ggsave(paste0(image_output_path,"results_combined.pdf"), plot = combined_plot, w
 
 ```
 
+```{r}
+gemeinde_check <- read_tsv(unz(
+  paste0(analysis_20261006, "2-brand-comm/summaries/calibration1.zip"),
+  "calibration1.infections_gemeinde.txt"
+), show_col_types = FALSE) %>% filter(day == 50)
+gemeinde_check %>% filter(district != "total") %>%
+  summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative))
+gemeinde_check %>% filter(district == "total") %>%
+  summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative))
+```
+
+
 ## Brandenburg
 
 ```{r}
-brand_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-br/"
+brand_directory <- paste0(analysis_20260203, "2-brand-br/")
 
 
 
@@ -267,7 +285,7 @@ brand_info <- read_delim(paste0(brand_directory, "_info.txt"), delim = ";") %>%
     filter(ode %in% c(1.0), importMult %in% c("x0.1"), maxOutdoorFraction == 1.0,thetaFactor == 0.75,workLeisureAdjustment == TRUE) #ode %in% c(1.0,4.0) #,"x0.075","x0.1","x0.125"
 
 brand_raw <- read_combine_episim_output_zipped(brand_directory,brand_info,"infections.txt.csv", c("date","nShowingSymptomsCumulative","nSusceptible","district"))
-
+  
 brand_params <- get_run_parameters(brand_directory)
 
 brand_filtered <- brand_raw %>% 
@@ -303,7 +321,7 @@ ggsave(paste0(image_output_path,"results_brand.pdf"), plot = brand_plot, width =
 
 ```{r}
 
-berlin_directory <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/3-berlin/"
+berlin_directory <- paste0(analysis_20260203, "3-berlin/")
 
 berlin_info <- read_delim(paste0(berlin_directory, "_info.txt"), delim = ";") %>% 
     filter(ode %in% c(1.0), importMult %in% c("x0.1"), maxOutdoorFraction == 1.0, thetaFactor == 0.75,workLeisureAdjustment == TRUE) #ode %in% c(1.0,4.0) #,"x0.075","x0.1","x0.125"
@@ -355,15 +373,142 @@ ggsave(paste0(image_output_path,"results_scenariocomparison.pdf"), plot = combin
 
 ```
 
+# Brandenburg Policies
+
+Baseline versus a subset of policies, averaging all five seeds with the same Brandenburg
+Gemeinde coverage for every run. The plot shows symptom-onset incidence; total
+infections in the table include asymptomatic infections. Reductions are relative
+to baseline over the common reporting period, not just the plotted date range.
+
+```{r brandenburg-policies}
+# Defined here because this section precedes the correlation analysis.
+correlation_directory <- paste0(analysis_20261006, "2-brand-comm/")
+policy_expected_seeds <- 5L
+policy_start <- "2020-09-01"
+policy_scope <- "all"
+policy_shares <- c(0.5, 1.0)
+policy_info <- read_delim(paste0(correlation_directory, "_info.txt"), delim = ";",
+                         col_types = cols(seed = col_character())) %>%
+  filter(ode == 1, commuterQuarantineDate == policy_start,
+         commuterQuarantineScope == policy_scope,
+         (commuterQuarantineMode == "OFF" & commuterQuarantineShare == 0.25) |
+         (commuterQuarantineMode %in% c("COMMUTERS", "GENERAL") &
+            commuterQuarantineShare %in% policy_shares)) %>%
+  mutate(scenario = if_else(commuterQuarantineMode == "OFF", "Baseline",
+    paste(commuterQuarantineMode, percent(commuterQuarantineShare, accuracy = 1))),
+    archive = paste0(correlation_directory, "summaries/", RunId, ".zip")) %>%
+  arrange(commuterQuarantineMode != "OFF", commuterQuarantineMode, commuterQuarantineShare)
+policy_scenarios <- unique(policy_info$scenario)
+policy_seeds <- sort(unique(policy_info$seed))
+stopifnot(length(policy_seeds) == policy_expected_seeds,
+          length(policy_scenarios) == 1 + 2 * length(policy_shares),
+          nrow(policy_info) == length(policy_scenarios) * policy_expected_seeds,
+          !anyDuplicated(policy_info[c("scenario", "seed")]),
+          all(file.exists(policy_info$archive)))
+
+policy_daily <- map_dfr(seq_len(nrow(policy_info)), function(i) {
+  run <- policy_info[i, ]
+  member <- paste0(run$RunId, ".infections_gemeinde.txt")
+  stopifnot(member %in% unzip(run$archive, list = TRUE)$Name)
+  raw <- read_tsv(unz(run$archive, member),
+    col_select = c(date, district, nSusceptible, nInfectedCumulative, nShowingSymptomsCumulative),
+    col_types = cols(date = col_date(), district = col_character(),
+      nSusceptible = col_double(), nInfectedCumulative = col_double(),
+      nShowingSymptomsCumulative = col_double())) %>%
+    filter(str_detect(district, "^12[0-9]{6}$"))
+  stopifnot(nrow(raw) > 0, !anyDuplicated(raw[c("date", "district")]))
+  coverage <- raw %>% count(date)
+  stopifnot(all(coverage$n == n_distinct(raw$district)))
+  daily <- raw %>% group_by(date) %>%
+    summarise(across(c(nSusceptible, nInfectedCumulative, nShowingSymptomsCumulative), sum),
+              .groups = "drop") %>% arrange(date)
+  stopifnot(all(diff(as.integer(daily$date)) == 1L), first(daily$nSusceptible) > 0)
+  daily %>% mutate(
+    population = first(nSusceptible),
+    infections = nInfectedCumulative - lag(nInfectedCumulative, default = 0),
+    symptom_onsets = nShowingSymptomsCumulative - lag(nShowingSymptomsCumulative, default = 0),
+    incidence = (nShowingSymptomsCumulative - lag(nShowingSymptomsCumulative, 7, default = 0)) /
+      population * 100000,
+    RunId = run$RunId, seed = run$seed, scenario = run$scenario,
+    gemeinden = n_distinct(raw$district))
+})
+# Compare identical dates and geographic coverage; never silently compare truncated runs.
+policy_coverage <- policy_daily %>% group_by(scenario, seed) %>%
+  summarise(start = min(date), end = max(date), days = n(),
+            population = first(population), gemeinden = first(gemeinden), .groups = "drop")
+stopifnot(n_distinct(policy_coverage$start) == 1, n_distinct(policy_coverage$end) == 1,
+          n_distinct(policy_coverage$days) == 1, all(policy_coverage$population > 0),
+          n_distinct(policy_coverage$gemeinden) == 1)
+
+# Retain per-seed statistics for checking variability separately from the mean curve.
+policy_stats_by_seed <- policy_daily %>% group_by(scenario, seed, RunId) %>%
+  summarise(total_infections = sum(infections), max_incidence = max(incidence),
+            peak_date = date[which.max(incidence)], .groups = "drop")
+policy_daily_mean <- policy_daily %>% group_by(scenario, date) %>%
+  summarise(across(c(infections, symptom_onsets, incidence), mean),
+            n_seeds = n_distinct(seed), .groups = "drop")
+stopifnot(all(policy_daily_mean$n_seeds == policy_expected_seeds))
+# Total infections are the mean totals; maximum incidence is the peak of the mean curve.
+policy_stats <- policy_daily_mean %>% group_by(scenario) %>%
+  summarise(n_seeds = first(n_seeds), total_infections = sum(infections),
+            total_symptom_onsets = sum(symptom_onsets),
+            max_incidence = max(incidence), peak_date = date[which.max(incidence)],
+            period_start = min(date), period_end = max(date), .groups = "drop")
+policy_baseline <- policy_stats %>% filter(scenario == "Baseline")
+policy_stats <- policy_stats %>% mutate(
+  infections_averted = policy_baseline$total_infections - total_infections,
+  infections_reduction_pct = 100 * infections_averted / policy_baseline$total_infections,
+  peak_reduction_pct = 100 * (policy_baseline$max_incidence - max_incidence) /
+    policy_baseline$max_incidence,
+  scenario = factor(scenario, levels = policy_scenarios)) %>% arrange(scenario)
+
+# Same centered smoothing, Thursday points, monthly axis and log scale as Brandenburg.
+policy_plot_data <- policy_daily_mean %>% group_by(scenario) %>% arrange(date, .by_group = TRUE) %>%
+  mutate(incidence_smooth = zoo::rollmean(incidence, 7, fill = NA, align = "center")) %>%
+  ungroup() %>% filter(date >= plot_start_date, date <= plot_end_date,
+                     lubridate::wday(date, week_start = 1) == 4) %>%
+  # Zero incidence cannot appear on a log axis; retain gaps instead of joining across them.
+  mutate(
+    # incidence_smooth = if_else(incidence_smooth > 0, incidence_smooth, NA_real_),
+    scenario = factor(scenario, levels = policy_scenarios))
+policy_colours <- setNames(c("#B87200", "#0072B2", "#56B4E9", "#009E73", "#CC79A7"),
+                          policy_scenarios)
+
+
+brand_policy_plot <- ggplot(policy_plot_data |> filter(date <= ymd("2020-06-01")), #
+                            aes(date, incidence_smooth, colour = scenario, group = scenario)) +
+  geom_line(linewidth = 1) + geom_point(shape = 24, fill = "white", size = 1.5) +
+    # lims(y=c(1,1000))+
+  scale_colour_manual(values = policy_colours) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b\n'%y") +
+  # scale_y_log10(labels = label_number(), breaks = c(0.1,1,10,100,1000)) +
+  # coord_cartesian(ylim = c(.1, NA))+
+  theme_minimal(base_size = 14) + theme(legend.position = "bottom") +
+  guides(colour = guide_legend(nrow = 2)) +
+  labs(title = "Brandenburg: baseline and policy cases",
+       subtitle = paste("Mean of", policy_expected_seeds, "seeds | Start:", policy_start, "| Scope:", policy_scope),
+       x = "Date", y = "COVID-19 incidence\nper 100,000", colour = NULL)
+brand_policy_plot
+```
+
+
+```{r brandenburg-policies}
+knitr::kable(policy_stats, digits = 2, caption =
+  "Five-seed means over the full reporting period. Reductions compare mean totals; peak incidence is the unsmoothed peak of the mean curve.")
+ggsave(paste0(image_output_path, "results_brand_policies.pdf"), brand_policy_plot, width = 10, height = 6)
+write_csv(policy_stats, paste0(image_output_path, "results_brand_policies_stats.csv"))
+```
+
+
 # Geospatial & Temporal Analysis
 
 ```{r}
 
-# brand_directory <- "/Users/jakob/git/public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-br-disagg/2-brand/"
+# brand_directory <- paste0(analysis_20260203, "2-brand-br-disagg/2-brand/")
 
-brand_directory_loc <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/2-brand-loc/"
+brand_directory_loc <- paste0(analysis_20260203, "2-brand-loc/")
 
-berlin_brandenburg_envelope <- st_read("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/berlinBrandenburgShp/berlinBrandenburg.shp") %>% st_transform(4236)
+berlin_brandenburg_envelope <- st_read(paste0(analysis_shared, "misc/berlinBrandenburgShp/berlinBrandenburg.shp")) %>% st_transform(4236)
 
 # plot infection map
 info_df <- read_delim(paste0(brand_directory_loc, "_info.txt"), delim = ";")
@@ -444,266 +589,170 @@ tmap_animation(tmap_for_video,filename = paste0(image_output_path, "map.mp4"))
 
 # Correlation Analysis
 
-Infections by Gemeinden
-```{r}
-# Use the same municipality boundaries and AGS identifiers as CommuterAnalysis.
-shp_gemeinde <- st_read(
-  "/Users/jakob/git/_SHAPE_FILES/gemeinden-DE-bkg-2023/vg5000_ebenen_1231/VG5000_GEM.shp",
-  quiet = TRUE
-) %>%
-  filter(SN_L == "12") %>%
-  transmute(gemeinde = as.character(AGS), gemeinde_name = GEN) %>%
-  group_by(gemeinde, gemeinde_name) %>%
-  summarise(.groups = "drop")
+Both spatial levels use the mean of the same five baseline seeds, symptom-onset incidence, wave boundary,
+and Berlin commuter definition. Correlations are exploratory Pearson correlations;
+p-values are unadjusted and do not account for spatial dependence.
+Landkreis incidence is aggregated from the Gemeinde report using AGS county codes;
+locations classified as `unknown` are excluded at both levels.
+Peaks and peak dates are calculated from the mean incidence curves, not averaged per-seed peaks.
 
-# Both infections and population refer to the 25% sample: no factor of four needed.
-brand_gemeinde_population <- read_csv(
-  "/Users/jakob/git/shared-svn/projects/episim/matsim-files/snz/Brandenburg/episim-input/br_population__gemeinde.csv",
-  col_types = cols(gemeinde = col_character(), cnt = col_double())
-) %>%
-  rename(population = cnt) %>%
-  inner_join(st_drop_geometry(shp_gemeinde), by = "gemeinde") %>%
-  filter(population > 0)
+```{r correlation-setup}
+correlation_directory <- paste0(analysis_20261006, "2-brand-comm/")
+correlation_input <- paste0(analysis_shared, "misc/commuter-analysis/")
+correlation_act <- "all" # Options: "work", "all"
+correlation_flow <- "person" # Options: "person" (unique people), "trip" (activity starts)
+correlation_sample_factor <- 4
+correlation_wave_boundary <- ymd("2020-06-01")
 
-stopifnot(length(runId) == 1, nrow(brand_gemeinde_population) > 0)
-brand_gemeinde_locations <- read_csv(
-  paste0(brand_directory_loc, runId, ".infectionLoc.csv"),
-  show_col_types = FALSE
-)
-# Retain the simulation start date used in the geospatial analysis above.
-gemeinde_start_date <- ymd("2020-03-20")
-gemeinde_dates <- seq(gemeinde_start_date,
-                      gemeinde_start_date + max(brand_gemeinde_locations$daysSinceStart),
-                      by = "day")
+# Choose all five baseline seeds (settings matched to ## Brandenburg above)
+correlation_info <- read_delim(paste0(correlation_directory, "_info.txt"), delim = ";",
+                              col_types = cols(seed = col_character())) %>%
+  filter(ode == 1, commuterQuarantineMode == "OFF",
+         commuterQuarantineDate == "2020-03-01", commuterQuarantineScope == "all",
+         commuterQuarantineShare == 0.25)
+stopifnot(nrow(correlation_info) == 5, n_distinct(correlation_info$seed) == 5)
 
-brand_gemeinde_infections <- brand_gemeinde_locations %>%
-  filter(is.finite(home_lon), is.finite(home_lat)) %>%
-  st_as_sf(coords = c("home_lon", "home_lat"), crs = 4326) %>%
-  st_transform(st_crs(shp_gemeinde)) %>%
-  st_join(shp_gemeinde %>% select(gemeinde), join = st_within, left = TRUE) %>%
-  st_drop_geometry()
+# Require every selected baseline archive before averaging
+correlation_zip <- paste0(correlation_directory, "summaries/", correlation_info$RunId, ".zip")
+stopifnot(file.exists(correlation_zip))
+correlation_params <- get_run_parameters(correlation_directory)
 
-# Unmatched points include Berlin/outside Brandenburg and gaps in generalized borders.
-message("Infections outside the Brandenburg Gemeinde polygons: ",
-        sum(is.na(brand_gemeinde_infections$gemeinde)))
-stopifnot(nrow(brand_gemeinde_infections) ==
-            sum(is.finite(brand_gemeinde_locations$home_lon) &
-                  is.finite(brand_gemeinde_locations$home_lat)))
+# Read all five selected ZIPs, retaining seed/configuration metadata for the helper.
+correlation_raw <- map_dfr(seq_len(nrow(correlation_info)), function(i) {
+  run <- correlation_info[i, ]
+  member <- paste0(run$RunId, ".infections_gemeinde.txt")
+  stopifnot(member %in% unzip(correlation_zip[i], list = TRUE)$Name)
+  raw <- read_tsv(unz(correlation_zip[i], member),
+    col_select = c(date, district, nShowingSymptomsCumulative, nSusceptible),
+    col_types = cols(date = col_date(), district = col_character(),
+      nShowingSymptomsCumulative = col_double(), nSusceptible = col_double())) %>%
+    filter(str_detect(district, "^12[0-9]{6}$"))
+  for (parameter in correlation_params) raw[[parameter]] <- run[[parameter]][[1]]
+  raw
+})
+stopifnot(!anyDuplicated(correlation_raw[c("seed", "district", "date")]))
+correlation_coverage <- correlation_raw %>% count(district, date)
+stopifnot(all(correlation_coverage$n == 5))
 
-brand_gemeinde_daily <- brand_gemeinde_infections %>%
-  filter(!is.na(gemeinde)) %>%
-  mutate(date = gemeinde_start_date + daysSinceStart) %>%
-  count(gemeinde, date, name = "infections")
+# Read shape file for gemeinden & filter to brandenburg (LK 12)
+correlation_counties <- st_read(
+  paste0(analysis_shared, "misc/vg5000/VG5000_KRS.shp"),
+  quiet = TRUE) %>% filter(SN_L == "12") %>%
+  transmute(county_ags = as.character(AGS), region = GEN)
 
-# Analogous to brand_lk_incidence: trailing seven days per 100,000 residents.
-# These are infection events (normal + import), not symptom onsets as in the LK helper.
-# Complete the daily grid, including municipalities with no infections.
-brand_gemeinde_incidence <- crossing(
-  gemeinde = brand_gemeinde_population$gemeinde, date = gemeinde_dates
-) %>%
-  left_join(brand_gemeinde_daily, by = c("gemeinde", "date")) %>%
-  mutate(infections = replace_na(infections, 0L)) %>%
-  left_join(brand_gemeinde_population, by = "gemeinde") %>%
-  arrange(gemeinde, date) %>%
-  group_by(gemeinde) %>%
-  mutate(
-    nInfectedCumulative = cumsum(infections),
-    infections_week = nInfectedCumulative - lag(nInfectedCumulative, n = 7, default = 0),
-    incidence = infections_week / population * 100000
-  ) %>%
-  ungroup() %>%
-  mutate(RunId = runId) %>%
-  arrange(date, gemeinde)
-```
+# Shared calculation keeps the Landkreis and Gemeinde analyses identical.
+regional_correlation <- function(spatial_system, shapes, berlin_id) {
+  raw <- correlation_raw
+  if (spatial_system == "landkreis") {
+    raw <- raw %>% mutate(county_ags = substr(district, 1, 5)) %>%
+      inner_join(st_drop_geometry(correlation_counties), by = "county_ags") %>%
+      group_by(date, district = region, across(all_of(correlation_params))) %>%
+      summarise(across(c(nShowingSymptomsCumulative, nSusceptible), sum), .groups = "drop")
+  }
+  raw <- raw %>% filter(district %in% shapes$region) %>% arrange(district, date)
+  stopifnot(nrow(raw) > 0, !anyDuplicated(raw[c("seed", "district", "date")]),
+            setequal(raw$district, shapes$region))
+  daily_check <- raw %>% group_by(seed, district) %>%
+    summarise(complete = all(diff(as.integer(date)) == 1L),
+              positive_population = first(nSusceptible) > 0, .groups = "drop")
+  stopifnot(all(daily_check$complete), all(daily_check$positive_population))
+  incidence <- convert_infections_into_incidence(correlation_directory, raw, TRUE) %>%
+    rename(region = district) %>% mutate(n_seeds = 5L)
 
+  # Flow/population files are 25% sample counts; native infection reports are scaled already.
+  population <- read_csv(paste0(correlation_input, "br_population__", spatial_system, ".csv"),
+    col_types = cols(.default = col_character(), cnt = col_double())) %>%
+    transmute(region = .data[[spatial_system]], pop = cnt * correlation_sample_factor)
+  
+  flows <- read_csv(paste0(correlation_input, "br_interregional-travellers-OD__act-",
+    correlation_act, "__flow-", correlation_flow, "__", spatial_system, ".csv"),
+    col_types = cols(from = col_character(), to = col_character(), cnt = col_double()))
+  
+  to_berlin <- flows %>% filter(to == berlin_id) %>% group_by(region = from) %>%
+    summarise(commuters_to_berlin = sum(cnt) * correlation_sample_factor, .groups = "drop")
+  
+  from_berlin <- flows %>% filter(from == berlin_id) %>% group_by(region = to) %>%
+    summarise(commuters_from_berlin = sum(cnt) * correlation_sample_factor, .groups = "drop")
+  
 
-```{r}
+  wave_metrics <- incidence %>%
+    mutate(wave = if_else(date <= correlation_wave_boundary, "1", "2")) %>%
+    group_by(region, wave) %>%
+    summarise(max_incidence = max(incidence), max_date = date[which.max(incidence)],
+              total_cases = sum(infections), .groups = "drop") %>%
+    mutate(max_day = as.numeric(max_date - min(incidence$date))) %>%
+    pivot_wider(names_from = wave, values_from = c(max_incidence, max_date, max_day, total_cases))
+  peak <- incidence %>% group_by(region) %>%
+    summarise(max_incidence = max(incidence), .groups = "drop")
+  merged <- shapes %>% left_join(population, by = "region") %>%
+    left_join(to_berlin, by = "region") %>% left_join(from_berlin, by = "region") %>%
+    mutate(across(c(commuters_to_berlin, commuters_from_berlin), ~ replace_na(.x, 0)),
+           commuters_total = commuters_to_berlin + commuters_from_berlin,
+           commuter_relative = commuters_total / pop,
+           area_km2 = as.numeric(st_area(st_transform(geometry, 3035))) / 1e6,
+           pop_density = pop / area_km2) %>%
+    left_join(wave_metrics, by = "region") %>% left_join(peak, by = "region")
+  stopifnot(!anyDuplicated(merged$region), all(is.finite(merged$pop)), all(merged$pop > 0))
 
+  correlations <- expand_grid(
+    predictor = c("commuter_relative", "pop_density"),
+    outcome = c("max_incidence_1", "max_day_1", "total_cases_1",
+                "max_incidence_2", "max_day_2", "total_cases_2")) %>%
+    mutate(statistics = map2(predictor, outcome, function(x, y) {
+      ok <- is.finite(merged[[x]]) & is.finite(merged[[y]])
+      n <- sum(ok)
+      if (n < 3 || sd(merged[[x]][ok]) == 0 || sd(merged[[y]][ok]) == 0)
+        return(tibble(n = n, correlation = NA_real_, p_value = NA_real_))
+      test <- cor.test(merged[[x]][ok], merged[[y]][ok], method = "pearson")
+      tibble(n = n, correlation = unname(test$estimate), p_value = test$p.value)
+    })) %>% unnest(statistics)
 
-shp_lk <- st_read("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/landkreise-DE/landkreise-in-germany.shp") %>% filter(name_1 == "Brandenburg") %>% select(district = name_2)
+  map_titles <- c(pop = "Population", pop_density = "Population per km²",
+    commuters_total = "Berlin commuters (both directions)", commuter_relative = "Berlin commuters / population",
+    max_incidence = "Maximum 7-day incidence per 100,000",
+    max_incidence_1 = "Peak incidence: first wave", max_incidence_2 = "Peak incidence: second wave",
+    max_day_1 = "Days to peak: first wave", max_day_2 = "Days to peak: second wave",
+    total_cases_1 = "Symptom onsets: first wave", total_cases_2 = "Symptom onsets: second wave")
+  maps <- imap(map_titles, ~ tm_shape(merged) + tm_polygons(fill = .y) +
+                 tm_title(.x) + tm_layout(frame = FALSE))
+  list(incidence = incidence, merged = merged, correlations = correlations, maps = maps)
+}
 
-
-flows <- read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/flows.csv")
-pop <- read_csv("../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/misc/pop.csv")
-
-rel_districts = c("Berlin",brand_districts)
-
-flows_to_Berlin <- flows %>% filter(from %in% brand_districts & to == "Berlin") %>% select(district = from, commuters_to_berlin = cnt)
-flows_from_Berlin <- flows %>% filter(from == "Berlin" & to %in% brand_districts) %>% select(district = to, commuters_from_berlin = cnt)
-pop2 <- pop %>% filter(district %in% brand_districts) %>% rename(pop = cnt) 
-
-flow_and_commuters <- pop2 %>%
-  left_join(flows_to_Berlin, by = "district") %>%
-  left_join(flows_from_Berlin, by = "district") %>% 
-  mutate(commuters_total = commuters_to_berlin + commuters_from_berlin) %>% 
-  left_join(shp_lk, by = "district")
-  # filter(from!="Berlin")
-
-
-
-```
-
-Linking commuter flows to incidence
-
-```{r}
-
-brand_lk_filtered <- brand_raw %>% 
-  filter(district %in% brand_districts)
-
-brand_lk_incidence <- convert_infections_into_incidence(brand_directory,brand_lk_filtered,FALSE)
-
-# first wave
-brand_lk_incidence_max_1 <- brand_lk_incidence %>% 
-  group_by(district) %>% 
-  filter(date <= ymd("2020-06-01")) %>% 
-  summarise(max_incidence_1 = max(incidence), max_date_1 = date[which.max(incidence)],total_cases_1 = sum(infections))  %>% 
-  mutate(max_day_1 = as.numeric(max_date_1 - ymd("2020-02-25")))
-
-# second wave
-brand_lk_incidence_max_2 <- brand_lk_incidence %>% 
-  group_by(district) %>% 
-  filter(date > ymd("2020-06-01")) %>% 
-  summarise(max_incidence_2 = max(incidence), max_date_2 = date[which.max(incidence)],total_cases_2 = sum(infections))  %>% 
-  mutate(max_day_2 = as.numeric(max_date_2 - ymd("2020-02-25")))
-
-
-```
-
-Merge
-
-```{r}
-merged <- flow_and_commuters %>%
-  full_join(brand_lk_incidence_max_1, by =  "district") %>%
-  full_join(brand_lk_incidence_max_2, by =  "district") %>% 
-  mutate(pop = pop * 4, commuters_total = commuters_total *4) %>% 
-  mutate(commuter_relative = commuters_total/pop) %>% st_as_sf()
-
-areas <- merged %>% st_area() %>% units::drop_units()
-
-# merged$area <- areas
-
-merged <- merged %>% mutate(area_km2 = areas/1000/1000) %>% mutate(pop_density = pop/area_km2 )
-
-# merged %>% view()
-
+# Separate output folders prevent the two map sets from overwriting each other.
+save_correlation_maps <- function(analysis, spatial_system) {
+  directory <- file.path(analysis_shared, "figures", paste0("correlation_", spatial_system))
+  dir.create(directory, recursive = TRUE, showWarnings = FALSE)
+  iwalk(analysis$maps, ~ tmap_save(.x, file.path(directory, paste0(.y, ".png"))))
+}
 tmap_mode("plot")
-
-
-cor1_pop <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "pop")+ tm_title("Population")+   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-
-cor2_pop_density <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "pop_density")+ tm_title("Population Density")+   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-cor3_commuters <- tm_basemap("Esri.WorldGrayCanvas") +tm_shape(merged) + tm_polygons(fill = "commuters_total") + tm_title("Commuters")+   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-cor4_commuter_density <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "commuter_relative") + tm_title("Commuters / Population")+   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-cor5_max_incidence_wave1 <- tm_basemap("Esri.WorldGrayCanvas")+ tm_shape(merged) + tm_polygons(fill = "max_incidence_1") + tm_title("Max Incidence (1st Wave)")+   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-cor6_max_incidence_wave2 <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "max_incidence_2") + tm_title("Max Incidence (2nd Wave)") +   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-cor7_max_date_wave1 <- tm_basemap("Esri.WorldGrayCanvas")+ tm_shape(merged) + tm_polygons(fill = "max_day_1") + tm_title("Date of Max Incidence (1st Wave)")+   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-cor8_max_date_wave2 <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "max_day_2") + tm_title("Date of Max Incidence (2nd Wave)") +   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-
-
-cor9_total_cases_wave1 <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "max_day_1") + tm_title("Number of Infections (1st Wave)") +   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-
-cor10_total_cases_wave2 <- tm_basemap("Esri.WorldGrayCanvas") + tm_shape(merged) + tm_polygons(fill = "max_day_2") + tm_title("Number of Infections (2nd Wave)") +   tm_layout(
-    legend.position = c("left", "bottom"),
-    legend.bg.color = "white",
-    legend.bg.alpha = 0.7,  
-    legend.text.size = 1.2,
-  legend.title.size = 1.4
-  )
-
-tmap_save(cor1_pop, "figures/cor1_pop.png")
-tmap_save(cor2_pop_density, "figures/cor2_pop_density.png")
-tmap_save(cor3_commuters, "figures/cor3_commuters.png")
-tmap_save(cor4_commuter_density, "figures/cor4_commuter_density.png")
-tmap_save(cor5_max_incidence_wave1, "figures/cor5_max_incidence_wave1.png")
-tmap_save(cor6_max_incidence_wave2, "figures/cor6_max_incidence_wave2.png")
-tmap_save(cor7_max_date_wave1, "figures/cor7_max_date_wave1.png")
-tmap_save(cor8_max_date_wave2, "figures/cor8_max_date_wave2.png")
-tmap_save(cor9_total_cases_wave1, "figures/cor9_total_cases_wave1.png")
-tmap_save(cor10_total_cases_wave2, "figures/cor10_total_cases_wave2.png")
 ```
 
-```{r}
+## Correlation by Landkreis
 
+```{r correlation-landkreis}
+shp_lk <- correlation_counties %>% select(region)
+brand_lk_analysis <- regional_correlation("landkreis", shp_lk, "Berlin")
+brand_lk_incidence <- brand_lk_analysis$incidence %>% rename(district = region)
+brand_lk_merged <- brand_lk_analysis$merged %>% rename(district = region)
+brand_lk_correlations <- brand_lk_analysis$correlations
+brand_lk_max_incidence_map <- brand_lk_analysis$maps$max_incidence
+brand_lk_max_incidence_map
+brand_lk_correlations |> view()
+save_correlation_maps(brand_lk_analysis, "landkreis")
+```
 
-# vars_x <- c("commuters_total", "commuter_relative", "pop", "pop_density")
-vars_x <- c("commuter_relative", "pop_density")
+## Correlation by Gemeinde
 
-
-vars_y <- c(
-  "max_incidence_1","max_day_1","total_cases_1",
-  "max_incidence_2","max_day_2","total_cases_2"
-)
-
-pairs <- expand_grid(var1 = vars_x, var2 = vars_y)
-
-result <- pairs %>%
-  mutate(
-    test = map2(var1, var2, ~ cor.test(merged[[.x]], merged[[.y]])),
-    correlation = map_dbl(test, "estimate"),
-    p_value = map_dbl(test, "p.value"),
-    stars = case_when(
-      p_value < 0.001 ~ "***",
-      p_value < 0.01  ~ "**",
-      p_value < 0.05  ~ "*",
-      TRUE ~ ""
-    ),
-    corr_rounded = sprintf("%.3f%s", round(correlation, 3), stars)
-  ) %>%
-  select(var1, var2, correlation, p_value, corr_rounded)
-
-result
+```{r correlation-gemeinde}
+shp_gemeinde <- st_read(paste0(analysis_shared, "misc/vg5000/VG5000_GEM.shp"), quiet = TRUE) %>%
+  filter(SN_L == "12") %>% transmute(region = as.character(AGS), gemeinde_name = GEN) %>%
+  group_by(region, gemeinde_name) %>% summarise(.groups = "drop")
+brand_gemeinde_analysis <- regional_correlation("gemeinde", shp_gemeinde, "11000000")
+brand_gemeinde_incidence <- brand_gemeinde_analysis$incidence %>% rename(gemeinde = region)
+brand_gemeinde_merged <- brand_gemeinde_analysis$merged %>% rename(gemeinde = region)
+brand_gemeinde_correlations <- brand_gemeinde_analysis$correlations
+brand_gemeinde_max_incidence_map <- brand_gemeinde_analysis$maps$max_incidence
+brand_gemeinde_max_incidence_map
+brand_gemeinde_correlations |> view()
+save_correlation_maps(brand_gemeinde_analysis, "gemeinde")
 ```
