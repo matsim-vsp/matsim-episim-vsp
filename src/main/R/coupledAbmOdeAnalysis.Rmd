@@ -22,6 +22,7 @@ library(purrr)
 source("masterJR-utils.R")
 
 # Data and generated outputs use only these three roots.
+analysis_20261103 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-11-03/"
 analysis_20260203 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/"
 analysis_20261006 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-10-06/"
 analysis_shared <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-JR-IB-SP/"
@@ -376,47 +377,51 @@ ggsave(paste0(image_output_path,"results_scenariocomparison.pdf"), plot = combin
 # Brandenburg Policies
 
 Baseline versus a subset of policies, averaging all five seeds with the same Brandenburg
-Gemeinde coverage for every run. The plot shows symptom-onset incidence; total
+district coverage for every run, using the regular infections output. The plot shows symptom-onset incidence; total
 infections in the table include asymptomatic infections. Reductions are relative
 to baseline over the common reporting period, not just the plotted date range.
 
 ```{r brandenburg-policies}
 # Defined here because this section precedes the correlation analysis.
-correlation_directory <- paste0(analysis_20261006, "2-brand-comm/")
+correlation_directory <- paste0(analysis_20261103, "3-brand-comm/")
 policy_expected_seeds <- 5L
 policy_start <- "2020-09-01"
 policy_scope <- "all"
-policy_shares <- c(0.5, 1.0)
+policy_shares <- seq(0.0,1.0,0.1)
+# Match percentages as integers to avoid floating-point equality dropping shares.
+# This batch has no OFF runs; COMMUTERS at 0% is the no-intervention baseline.
 policy_info <- read_delim(paste0(correlation_directory, "_info.txt"), delim = ";",
                          col_types = cols(seed = col_character())) %>%
+  mutate(policy_share_pct = as.integer(round(100 * commuterQuarantineShare))) %>%
   filter(ode == 1, commuterQuarantineDate == policy_start,
          commuterQuarantineScope == policy_scope,
-         (commuterQuarantineMode == "OFF" & commuterQuarantineShare == 0.25) |
-         (commuterQuarantineMode %in% c("COMMUTERS", "GENERAL") &
-            commuterQuarantineShare %in% policy_shares)) %>%
-  mutate(scenario = if_else(commuterQuarantineMode == "OFF", "Baseline",
-    paste(commuterQuarantineMode, percent(commuterQuarantineShare, accuracy = 1))),
+         commuterQuarantineMode %in% c("COMMUTERS", "GENERAL"),
+         policy_share_pct %in% as.integer(round(100 * policy_shares)),
+         commuterQuarantineMode != "GENERAL" | policy_share_pct > 0) %>%
+  mutate(scenario = if_else(policy_share_pct == 0, "Baseline",
+    paste(commuterQuarantineMode, percent(policy_share_pct / 100, accuracy = 1))),
     archive = paste0(correlation_directory, "summaries/", RunId, ".zip")) %>%
-  arrange(commuterQuarantineMode != "OFF", commuterQuarantineMode, commuterQuarantineShare)
+  arrange(policy_share_pct != 0, commuterQuarantineMode, policy_share_pct)
 policy_scenarios <- unique(policy_info$scenario)
 policy_seeds <- sort(unique(policy_info$seed))
 stopifnot(length(policy_seeds) == policy_expected_seeds,
-          length(policy_scenarios) == 1 + 2 * length(policy_shares),
+          sum(policy_info$scenario == "Baseline") == policy_expected_seeds,
           nrow(policy_info) == length(policy_scenarios) * policy_expected_seeds,
           !anyDuplicated(policy_info[c("scenario", "seed")]),
           all(file.exists(policy_info$archive)))
 
 policy_daily <- map_dfr(seq_len(nrow(policy_info)), function(i) {
   run <- policy_info[i, ]
-  member <- paste0(run$RunId, ".infections_gemeinde.txt")
+  member <- paste0(run$RunId, ".infections.txt.csv")
   stopifnot(member %in% unzip(run$archive, list = TRUE)$Name)
   raw <- read_tsv(unz(run$archive, member),
     col_select = c(date, district, nSusceptible, nInfectedCumulative, nShowingSymptomsCumulative),
     col_types = cols(date = col_date(), district = col_character(),
       nSusceptible = col_double(), nInfectedCumulative = col_double(),
       nShowingSymptomsCumulative = col_double())) %>%
-    filter(str_detect(district, "^12[0-9]{6}$"))
-  stopifnot(nrow(raw) > 0, !anyDuplicated(raw[c("date", "district")]))
+    filter(district %in% brand_districts)
+  stopifnot(nrow(raw) > 0, !anyDuplicated(raw[c("date", "district")]),
+            setequal(unique(raw$district), brand_districts))
   coverage <- raw %>% count(date)
   stopifnot(all(coverage$n == n_distinct(raw$district)))
   daily <- raw %>% group_by(date) %>%
@@ -430,15 +435,15 @@ policy_daily <- map_dfr(seq_len(nrow(policy_info)), function(i) {
     incidence = (nShowingSymptomsCumulative - lag(nShowingSymptomsCumulative, 7, default = 0)) /
       population * 100000,
     RunId = run$RunId, seed = run$seed, scenario = run$scenario,
-    gemeinden = n_distinct(raw$district))
+    districts = n_distinct(raw$district))
 })
 # Compare identical dates and geographic coverage; never silently compare truncated runs.
 policy_coverage <- policy_daily %>% group_by(scenario, seed) %>%
   summarise(start = min(date), end = max(date), days = n(),
-            population = first(population), gemeinden = first(gemeinden), .groups = "drop")
+            population = first(population), districts = first(districts), .groups = "drop")
 stopifnot(n_distinct(policy_coverage$start) == 1, n_distinct(policy_coverage$end) == 1,
           n_distinct(policy_coverage$days) == 1, all(policy_coverage$population > 0),
-          n_distinct(policy_coverage$gemeinden) == 1)
+          n_distinct(policy_coverage$districts) == 1)
 
 # Retain per-seed statistics for checking variability separately from the mean curve.
 policy_stats_by_seed <- policy_daily %>% group_by(scenario, seed, RunId) %>%
@@ -462,40 +467,106 @@ policy_stats <- policy_stats %>% mutate(
     policy_baseline$max_incidence,
   scenario = factor(scenario, levels = policy_scenarios)) %>% arrange(scenario)
 
-# Same centered smoothing, Thursday points, monthly axis and log scale as Brandenburg.
-policy_plot_data <- policy_daily_mean %>% group_by(scenario) %>% arrange(date, .by_group = TRUE) %>%
+# Plot settings: percentages must be available in policy_shares above; 0 means OFF.
+policy_plot_percentages <- seq(20,100,20)
+policy_wave_boundary <- ymd("2020-06-01")
+# Named colours can be edited independently; unused percentages keep their colours.
+policy_colour_options <- c(
+  "OFF" = "#333333", "10%" = "#56B4E9", "20%" = "#009E73",
+  "30%" = "#E69F00", "40%" = "#CC79A7", "50%" = "#0072B2",
+  "60%" = "#8C564B", "70%" = "#9467BD", "80%" = "#228833",
+  "90%" = "#AA3377", "100%" = "#D55E00")
+policy_plot_percentages <- sort(unique(policy_plot_percentages))
+stopifnot(length(policy_plot_percentages) > 0,
+          all(policy_plot_percentages %in% as.integer(round(100 * policy_shares))))
+policy_share_labels <- if_else(policy_plot_percentages == 0, "OFF",
+                               paste0(policy_plot_percentages, "%"))
+stopifnot(all(policy_share_labels %in% names(policy_colour_options)))
+policy_plot_scenarios <- c(
+  if (0 %in% policy_plot_percentages) "Baseline",
+  unlist(lapply(policy_plot_percentages[policy_plot_percentages > 0], function(pct) {
+    paste(c("COMMUTERS", "GENERAL"), paste0(pct, "%"))
+  })))
+stopifnot(all(policy_plot_scenarios %in% policy_scenarios))
+
+# Keep the same centered smoothing and Thursday points as the Brandenburg plot.
+policy_plot_data <- policy_daily_mean %>%
+  filter(scenario %in% policy_plot_scenarios) %>%
+  group_by(scenario) %>% arrange(date, .by_group = TRUE) %>%
   mutate(incidence_smooth = zoo::rollmean(incidence, 7, fill = NA, align = "center")) %>%
   ungroup() %>% filter(date >= plot_start_date, date <= plot_end_date,
                      lubridate::wday(date, week_start = 1) == 4) %>%
-  # Zero incidence cannot appear on a log axis; retain gaps instead of joining across them.
-  mutate(
-    # incidence_smooth = if_else(incidence_smooth > 0, incidence_smooth, NA_real_),
-    scenario = factor(scenario, levels = policy_scenarios))
-policy_colours <- setNames(c("#B87200", "#0072B2", "#56B4E9", "#009E73", "#CC79A7"),
-                          policy_scenarios)
+  mutate(share = factor(if_else(scenario == "Baseline", "OFF",
+                                str_extract(scenario, "[0-9]+%$")),
+                        levels = policy_share_labels),
+         policy_type = factor(case_when(
+           scenario == "Baseline" ~ "OFF",
+           str_starts(scenario, "COMMUTERS") ~ "Commuter",
+           TRUE ~ "General"),
+           levels = c(if (0 %in% policy_plot_percentages) "OFF",
+                      if (any(policy_plot_percentages > 0)) c("Commuter", "General"))))
+policy_colours <- policy_colour_options[policy_share_labels]
+policy_line_types <- c("OFF" = "solid", "Commuter" = "solid", "General" = "dashed")
 
-
-brand_policy_plot <- ggplot(policy_plot_data |> filter(date <= ymd("2020-06-01")), #
-                            aes(date, incidence_smooth, colour = scenario, group = scenario)) +
-  geom_line(linewidth = 1) + geom_point(shape = 24, fill = "white", size = 1.5) +
-    # lims(y=c(1,1000))+
-  scale_colour_manual(values = policy_colours) +
+policy_base_plot <- ggplot(policy_plot_data,
+    aes(date, incidence_smooth, colour = share,
+        linetype = policy_type, group = scenario)) +
+  geom_line(linewidth = 1, na.rm = TRUE) +
+  scale_colour_manual(values = policy_colours, drop = FALSE) +
+  scale_linetype_manual(values = policy_line_types, drop = FALSE) +
   scale_x_date(date_breaks = "1 month", date_labels = "%b\n'%y") +
-  # scale_y_log10(labels = label_number(), breaks = c(0.1,1,10,100,1000)) +
-  # coord_cartesian(ylim = c(.1, NA))+
-  theme_minimal(base_size = 14) + theme(legend.position = "bottom") +
-  guides(colour = guide_legend(nrow = 2)) +
-  labs(title = "Brandenburg: baseline and policy cases",
-       subtitle = paste("Mean of", policy_expected_seeds, "seeds | Start:", policy_start, "| Scope:", policy_scope),
-       x = "Date", y = "COVID-19 incidence\nper 100,000", colour = NULL)
+  theme_minimal(base_size = 14) +
+  labs(x = "Date", y = "COVID-19 incidence\nper 100,000",
+       colour = "Policy share", linetype = "Policy")
+
+
+ggplot(policy_plot_data |> filter(policy_type == "Commuter"), aes(date, incidence_smooth, colour = share,
+                          linetype = policy_type, group = scenario)) +
+    geom_line(linewidth = 1, na.rm = TRUE) +
+    scale_colour_manual(values = policy_colours, drop = FALSE) +
+    scale_linetype_manual(values = policy_line_types, drop = FALSE) +
+    scale_x_date(date_breaks = "1 month", date_labels = "%b\n'%y") +
+    theme_minimal(base_size = 14) +
+    labs(title = "Commuter policies", x = "Date", y = "COVID-19 incidence\nper 100,000",
+         colour = "Policy share", linetype = "Policy") 
+    # scale_y_continuous(labels = label_number(),limits = c(0, NA))
+
+
+
+# Zero incidence becomes a gap only in the logarithmic panel.
+policy_log_data <- policy_plot_data %>%
+  mutate(incidence_smooth = if_else(incidence_smooth > 0, incidence_smooth, NA_real_))
+policy_full_plot <- policy_base_plot %+% policy_log_data +
+  scale_y_log10(labels = label_number(), breaks = c(0.1, 1, 10, 100, 1000)) +
+  labs(title = "Full period (log scale)")
+
+policy_first_wave_plot <- policy_base_plot %+%
+  filter(policy_plot_data, date <= policy_wave_boundary) +
+  scale_y_continuous(labels = label_number(), limits = c(0, NA)) +
+  labs(title = "First wave (linear scale)")
+
+policy_second_wave_plot <- policy_base_plot %+%
+  filter(policy_plot_data, date > policy_wave_boundary) +
+  scale_y_continuous(labels = label_number(), limits = c(0, NA)) +
+  labs(title = "Second wave (linear scale)")
+
+policy_second_wave_plot
+
+brand_policy_plot <- (policy_full_plot / (policy_first_wave_plot | policy_second_wave_plot)) +
+  patchwork::plot_layout(heights = c(2, 1), guides = "collect") +
+  patchwork::plot_annotation(
+    title = "Brandenburg: baseline and policy cases",
+    subtitle = paste("Mean of", policy_expected_seeds, "seeds | Start:", policy_start,
+                     "| Scope:", policy_scope, "| OFF = 0% commuter policy")) &
+  theme(legend.position = "bottom")
 brand_policy_plot
 ```
 
 
-```{r brandenburg-policies}
+```{r brandenburg-policies-summary}
 knitr::kable(policy_stats, digits = 2, caption =
   "Five-seed means over the full reporting period. Reductions compare mean totals; peak incidence is the unsmoothed peak of the mean curve.")
-ggsave(paste0(image_output_path, "results_brand_policies.pdf"), brand_policy_plot, width = 10, height = 6)
+ggsave(paste0(image_output_path, "results_brand_policies.pdf"), brand_policy_plot, width = 12, height = 10)
 write_csv(policy_stats, paste0(image_output_path, "results_brand_policies_stats.csv"))
 ```
 

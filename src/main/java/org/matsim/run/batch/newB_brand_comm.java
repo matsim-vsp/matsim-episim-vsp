@@ -217,7 +217,7 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 
 		}
 
-		episimConfig.setCommuterQuarantineMode(params.commuterQuarantineMode);
+		episimConfig.setCommuterQuarantineMode(SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode.valueOf(params.commuterQuarantineMode));
 //		episimConfig.setCommuterQuarantineMode(SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode.COMMUTERS);
 
 
@@ -240,7 +240,7 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 	 */
 	public static final class Params {
 		// general
-		@GenerateSeeds(5)
+		@GenerateSeeds(5) // 5
 		public long seed;
 
 
@@ -250,16 +250,17 @@ public class newB_brand_comm implements BatchRun<newB_brand_comm.Params> {
 		public double ode;
 
 
-		@EnumParameter(SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode.class)
-		public SymmetricContactModelWithOdeCoupling.CommuterQuarantineMode commuterQuarantineMode;
+		@StringParameter({"COMMUTERS","GENERAL"}) //2
+		public String commuterQuarantineMode;
 
-		@StringParameter({"2020-03-01", "2020-04-01", "2020-05-01","2020-06-01","2020-07-01","2020-08-01","2020-09-01","2020-10-01", "2020-11-01","2020-12-01","2021-01-01","2021-02-01"})
+		@StringParameter({"2020-03-01","2020-05-01","2020-07-01","2020-09-01", "2020-11-01","2021-01-01"}) //6
 		public String commuterQuarantineDate;
 
-		@StringParameter({"all","work"})
+		@StringParameter({"all","work"}) //2
 		public String commuterQuarantineScope;
 
-		@Parameter({0.25, 0.5, .75, 1.0})
+		@Parameter({0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, .7,  .8, .9, 1.0})//11
+
 //		@Parameter({ 1.0})
 		public double commuterQuarantineShare;
 

@@ -1,6 +1,7 @@
 
 # Custom Ignores
-
+figures/
+*.Rproj
 test/output/
 battery
 output
