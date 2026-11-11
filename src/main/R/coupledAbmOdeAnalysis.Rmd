@@ -1,6 +1,6 @@
 ---
 title: "coupledAbmOdeAnalysis"
-author: "Inan Bostanci & Jakob Rehmann"
+author: "Inan Bostanci & Jakob Rehmann & Sydney Paltra"
 date: "2025-08-28"
 output: html_document
 ---
@@ -22,10 +22,10 @@ library(purrr)
 source("masterJR-utils.R")
 
 # Data and generated outputs use only these three roots.
-analysis_20261103 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-11-03/"
-analysis_20260203 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/"
-analysis_20261006 <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-10-06/"
-analysis_shared <- "../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-JR-IB-SP/"
+analysis_20261103 <- "../../../../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-11-03/"
+analysis_20260203 <- "../../../../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-02-03/"
+analysis_20261006 <- "../../../../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-10-06/"
+analysis_shared <- "../../../../public-svn/matsim/scenarios/countries/de/episim/battery/jakob/2026-JR-IB-SP/"
 
 
 ```
@@ -150,15 +150,18 @@ image_output_path <- paste0(analysis_shared, "images/")
 dir.create(image_output_path, recursive = TRUE, showWarnings = FALSE)
 
 common_style <- list(
-  scale_color_manual(values = c("Data (RKI)" = "#005EB8","Model" = "#B87200")),
-  scale_fill_manual(values = c("Data (RKI)" = "#FFFFFF","Model" = "#FFFFFF")),
+  scale_color_manual(values = c("Data (RKI)" = "#005EB8", "Model" = "#A8B800")),
+  scale_fill_manual(values = c("Data (RKI)" = "#FFFFFF", "Model" = "#FFFFFF")),
   scale_x_date(
-    date_breaks = "1 month",
-    date_labels = "%b\n'%y"
+    breaks = function(lims) seq(floor_date(lims[1], "month"), lims[2], by = "2 months"),
+    date_labels = "%d.%m."
   ),
-  scale_y_log10(limits = c(0.1,1000), labels = label_number()),
-  theme_minimal(base_size = 18),
-  theme(legend.position = "bottom"),
+  scale_y_log10(limits = c(0.1, 1000), labels = label_number()),
+  theme_minimal(base_size = 16),
+  theme(
+    legend.position = "bottom",
+    axis.text = element_text(size = 16)
+  ),
   labs(x = "Date", y = "COVID-19 incidence\nper 100,000", col = NULL)
 )
 
@@ -222,29 +225,26 @@ combined_incidence_filtered <- combined_incidence %>%
   filter(lubridate::wday(date, label = TRUE)=="Thu") %>%
   ungroup()
 
-combined_plot_combined <- ggplot(data = combined_incidence_filtered %>% filter(district == "Combined"), aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+combined_plot_combined <- ggplot(data = combined_incidence_filtered %>% filter(district == "Combined"), aes(date,incidence_smooth, col = scenario, fill = scenario), group = scenario) +
   geom_line(data = subset(combined_incidence_filtered, scenario == "Model"), size = 1) +
-  geom_point(size = 1.5, show.legend = FALSE) +  
-  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  geom_point(size = 1.75, show.legend = FALSE) +  
   labs(title ="Incidence in Berlin + Brandenburg", subtitle = "Berlin + Brandenburg modelled as ABM") +
   common_style +
   guides(color = guide_legend(override.aes = list(shape = c(2, 17))))
 
 combined_plot_combined
 
-combined_plot_berlin <- ggplot(data = combined_incidence_filtered %>% filter(district == "Berlin"), aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+combined_plot_berlin <- ggplot(data = combined_incidence_filtered %>% filter(district == "Berlin"), aes(date,incidence_smooth, col = scenario, fill = scenario), group = scenario) +
   geom_line(data = subset(combined_incidence_filtered, scenario == "Model"), size = 1) +
-  geom_point(size = 1.5) +  
-  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  geom_point(size = 1.75) +  
   labs(title ="Incidence in Berlin", subtitle = "Berlin + Brandenburg modelled as ABM") +
   common_style + guides(color = guide_legend(override.aes = list(shape = c(2, 17))))
 
 combined_plot_berlin
 
-combined_plot_brand <- ggplot(data = combined_incidence_filtered %>% filter(district == "Brandenburg"), aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+combined_plot_brand <- ggplot(data = combined_incidence_filtered %>% filter(district == "Brandenburg"), aes(date,incidence_smooth, col = scenario, fill = scenario), group = scenario) +
   geom_line(data = subset(combined_incidence_filtered, scenario == "Model"), size = 1) +
-  geom_point(size = 1.5) +  
-  scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
+  geom_point(size = 1.75) +  
   labs(title ="Incidence in Brandenburg", subtitle = "Berlin + Brandenburg modelled as ABM") +
   guides(color = guide_legend(override.aes = list(shape = c(2, 17)))) +
   common_style 
@@ -273,7 +273,6 @@ gemeinde_check %>% filter(district != "total") %>%
 gemeinde_check %>% filter(district == "total") %>%
   summarise(nShowingSymptomsCumulative = sum(nShowingSymptomsCumulative))
 ```
-
 
 ## Brandenburg
 
@@ -305,7 +304,7 @@ brand_incidence_filtered <- brand_incidence %>%
     mutate(incidence_smooth = rollmean(incidence, k = 7, fill = NA, align = "center")) %>%
   filter(lubridate::wday(date, label = TRUE)=="Thu")
 
-brand_plot <- ggplot(data = brand_incidence_filtered, aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+brand_plot <- ggplot(data = brand_incidence_filtered, aes(date,incidence_smooth, col = scenario, fill = scenario), group = scenario) +
   geom_line(data = subset(brand_incidence_filtered, scenario == "Model"), size = 1) +
   geom_point(size = 1.5, show.legend = FALSE) +  
   scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
@@ -344,7 +343,7 @@ berlin_incidence_filtered <-  berlin_incidence %>%
     mutate(incidence_smooth = rollmean(incidence, k = 7, fill = NA, align = "center")) %>%
   filter(lubridate::wday(date, label = TRUE)=="Thu")
 
-berlin_plot <- ggplot(data = berlin_incidence_filtered, aes(date,incidence_smooth, col = scenario, shape = scenario, fill = scenario), group = scenario) +
+berlin_plot <- ggplot(data = berlin_incidence_filtered, aes(date,incidence_smooth, col = scenario, fill = scenario), group = scenario) +
   geom_line(data = subset(berlin_incidence_filtered, scenario == "Model"), size = 1) +
   geom_point(size = 1.5, show.legend = FALSE) +  
   scale_shape_manual(values = c("Model" = 24, "Data (RKI)" = 24)) +
@@ -376,10 +375,7 @@ ggsave(paste0(image_output_path,"results_scenariocomparison.pdf"), plot = combin
 
 # Brandenburg Policies
 
-Baseline versus a subset of policies, averaging all five seeds with the same Brandenburg
-district coverage for every run, using the regular infections output. The plot shows symptom-onset incidence; total
-infections in the table include asymptomatic infections. Reductions are relative
-to baseline over the common reporting period, not just the plotted date range.
+Baseline versus a subset of policies, averaging all five seeds with the same Brandenburg district coverage for every run, using the regular infections output. The plot shows symptom-onset incidence; total infections in the table include asymptomatic infections. Reductions are relative to baseline over the common reporting period, not just the plotted date range.
 
 ```{r brandenburg-policies}
 # Defined here because this section precedes the correlation analysis.
@@ -562,14 +558,12 @@ brand_policy_plot <- (policy_full_plot / (policy_first_wave_plot | policy_second
 brand_policy_plot
 ```
 
-
 ```{r brandenburg-policies-summary}
 knitr::kable(policy_stats, digits = 2, caption =
   "Five-seed means over the full reporting period. Reductions compare mean totals; peak incidence is the unsmoothed peak of the mean curve.")
 ggsave(paste0(image_output_path, "results_brand_policies.pdf"), brand_policy_plot, width = 12, height = 10)
 write_csv(policy_stats, paste0(image_output_path, "results_brand_policies_stats.csv"))
 ```
-
 
 # Geospatial & Temporal Analysis
 
@@ -592,7 +586,7 @@ runId <- info_df %>% filter(seed == 7564655870752978944) %>% filter(ode %in% c(1
 geospatial <- read_delim(paste0(brand_directory_loc,runId,".infectionLoc.csv")) %>%
   st_as_sf(coords = c("home_lon","home_lat"), crs = 4236) %>%
   st_filter(berlin_brandenburg_envelope) %>%   
-  mutate(infection_type = factor(infection_type, levels = c("normal","import"),labels = c("ABM Infections","ODE Import"))) %>% 
+  mutate(infection_type = factor(infection_type, levels = c("normal","import"),labels = c("ABM infections","ODE import"))) %>% 
   mutate(date = ymd("2020-03-20") + daysSinceStart)
 
 
@@ -601,13 +595,17 @@ tmap_mode("plot")
 geospatial_plot_hist <- geospatial %>% 
   ggplot() +
   geom_histogram(aes(date, fill = infection_type), binwidth = 7)  +
+  labs(title ="Urban-driven scenario", subtitle = "(Brandenburg infections)", x = "Date", y = "New Infections") +
+  scale_fill_manual(values = c("ABM infections" = "#214363", "ODE import" = "#B80A00")) +
   scale_x_date(
-    date_breaks = "1 month",      # show every month
-    date_labels = "%b\n'%y"         # e.g., Jan 2025
+    breaks = function(lims) seq(floor_date(lims[1], "month"), lims[2], by = "2 months"),
+    date_labels = "%d.%m."
   ) +
-  # scale_y_log10() + 
-  labs(title ="New Infections in Brandenburg", subtitle = "Coupled Model: Brandenburg as ABM | Berlin as ODE", x = "Date", y = "New Infections") +
-  theme_minimal(base_size = 14) 
+  theme_minimal(base_size = 16) +
+  theme(
+    legend.position = "bottom",
+    axis.text = element_text(size = 16)
+  )
 
 geospatial_plot_hist
 
@@ -660,12 +658,7 @@ tmap_animation(tmap_for_video,filename = paste0(image_output_path, "map.mp4"))
 
 # Correlation Analysis
 
-Both spatial levels use the mean of the same five baseline seeds, symptom-onset incidence, wave boundary,
-and Berlin commuter definition. Correlations are exploratory Pearson correlations;
-p-values are unadjusted and do not account for spatial dependence.
-Landkreis incidence is aggregated from the Gemeinde report using AGS county codes;
-locations classified as `unknown` are excluded at both levels.
-Peaks and peak dates are calculated from the mean incidence curves, not averaged per-seed peaks.
+Both spatial levels use the mean of the same five baseline seeds, symptom-onset incidence, wave boundary, and Berlin commuter definition. Correlations are exploratory Pearson correlations; p-values are unadjusted and do not account for spatial dependence. Landkreis incidence is aggregated from the Gemeinde report using AGS county codes; locations classified as `unknown` are excluded at both levels. Peaks and peak dates are calculated from the mean incidence curves, not averaged per-seed peaks.
 
 ```{r correlation-setup}
 correlation_directory <- paste0(analysis_20261006, "2-brand-comm/")
