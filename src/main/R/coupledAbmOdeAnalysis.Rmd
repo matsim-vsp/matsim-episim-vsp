@@ -441,8 +441,21 @@ stopifnot(n_distinct(policy_coverage$start) == 1, n_distinct(policy_coverage$end
           n_distinct(policy_coverage$days) == 1, all(policy_coverage$population > 0),
           n_distinct(policy_coverage$districts) == 1)
 
+# Evaluation window for all policy statistics (peaks, totals, reductions, gains).
+# Spring policy (start before the wave boundary): policy start until the end of the first wave.
+# Fall policy: policy start until the end of the simulation.
+policy_wave_boundary <- ymd("2020-06-01")
+policy_window <- c(ymd(policy_start),
+                   if (ymd(policy_start) < policy_wave_boundary) policy_wave_boundary
+                   else max(policy_daily$date))
+stopifnot(policy_window[1] < policy_window[2])
+policy_window_label <- paste(format(policy_window, "%d.%m.%Y"), collapse = "–")
+in_policy_window <- function(df) filter(df, date >= policy_window[1], date <= policy_window[2])
+# Spring and fall runs write separate output files
+policy_output_prefix <- paste0(image_output_path, "results_brand_policies_start-", policy_start)
+
 # Retain per-seed statistics for checking variability separately from the mean curve.
-policy_stats_by_seed <- policy_daily %>% group_by(scenario, seed, RunId) %>%
+policy_stats_by_seed <- policy_daily %>% in_policy_window() %>% group_by(scenario, seed, RunId) %>%
   summarise(total_infections = sum(infections), max_incidence = max(incidence),
             peak_date = date[which.max(incidence)], .groups = "drop")
 policy_daily_mean <- policy_daily %>% group_by(scenario, date) %>%
@@ -450,7 +463,7 @@ policy_daily_mean <- policy_daily %>% group_by(scenario, date) %>%
             n_seeds = n_distinct(seed), .groups = "drop")
 stopifnot(all(policy_daily_mean$n_seeds == policy_expected_seeds))
 # Total infections are the mean totals; maximum incidence is the peak of the mean curve.
-policy_stats <- policy_daily_mean %>% group_by(scenario) %>%
+policy_stats <- policy_daily_mean %>% in_policy_window() %>% group_by(scenario) %>%
   summarise(n_seeds = first(n_seeds), total_infections = sum(infections),
             total_symptom_onsets = sum(symptom_onsets),
             max_incidence = max(incidence), peak_date = date[which.max(incidence)],
@@ -465,7 +478,6 @@ policy_stats <- policy_stats %>% mutate(
 
 # Plot settings: percentages must be available in policy_shares above; 0 means OFF.
 policy_plot_percentages <- seq(20,100,20)
-policy_wave_boundary <- ymd("2020-06-01")
 # Named colours can be edited independently; unused percentages keep their colours.
 policy_colour_options <- c(
   "OFF" = "#333333", "10%" = "#56B4E9", "20%" = "#009E73",
@@ -563,6 +575,389 @@ knitr::kable(policy_stats, digits = 2, caption =
   "Five-seed means over the full reporting period. Reductions compare mean totals; peak incidence is the unsmoothed peak of the mean curve.")
 ggsave(paste0(image_output_path, "results_brand_policies.pdf"), brand_policy_plot, width = 12, height = 10)
 write_csv(policy_stats, paste0(image_output_path, "results_brand_policies_stats.csv"))
+```
+
+# Brandenburg Policies: decomposition of the policy effect
+
+Each bar is 100% of the OFF value (COMMUTERS 0%). GENERAL x% quarantines the same number of agents as COMMUTERS x%, picked at random, so it is the matched control for the commuter policy. The commuter bar is split into what random quarantine of that many agents achieves (blue) and what targeting commuters adds on top (orange). If targeting does worse than random, the gap is shown in pink instead. Labels give the net reduction; error bars give the range across the paired seeds (per-seed reduction against the same seed's OFF run).
+
+```{r brandenburg-policies-stacked}
+# Settings ------------------------------------------------------------------
+# One of "total_infections", "total_symptom_onsets", "max_incidence"
+policy_metric <- "total_infections"
+# FALSE hides the grey "Remaining" part and zooms in on the averted share
+policy_show_remaining <- TRUE
+
+policy_metric_label <- c(total_infections = "infections",
+                         total_symptom_onsets = "symptom onsets",
+                         max_incidence = "peak incidence")[[policy_metric]]
+
+# Averted share per mode and quarantine share (mean over seeds) -------------
+policy_effects <- policy_stats %>%
+  filter(scenario != "Baseline") %>%
+  transmute(mode = str_extract(as.character(scenario), "^[A-Z]+"),
+            share_pct = as.integer(str_extract(as.character(scenario), "[0-9]+(?=%$)")),
+            averted_pct = 100 * (policy_baseline[[policy_metric]] - .data[[policy_metric]]) /
+              policy_baseline[[policy_metric]]) %>%
+  pivot_wider(names_from = mode, values_from = averted_pct) %>%
+  arrange(share_pct)
+stopifnot(all(c("COMMUTERS", "GENERAL") %in% names(policy_effects)),
+          !anyNA(policy_effects$COMMUTERS), !anyNA(policy_effects$GENERAL))
+if (any(policy_effects$COMMUTERS < 0 | policy_effects$GENERAL < 0))
+  warning("Some policies increase ", policy_metric_label,
+          "relative to no NPI (likely seed noise); those segments are drawn below zero.")
+
+# Paired per-seed range (only for metrics available per seed) ---------------
+# Note: per-seed max_incidence is each seed's own peak, whereas the bars use the
+# peak of the mean curve, so the error bars are only indicative for that metric.
+policy_seed_range <- NULL
+if (policy_metric %in% names(policy_stats_by_seed)) {
+  seed_baseline <- policy_stats_by_seed %>% filter(scenario == "Baseline") %>%
+    select(seed, baseline_value = all_of(policy_metric))
+  policy_seed_range <- policy_stats_by_seed %>%
+    filter(scenario != "Baseline") %>%
+    inner_join(seed_baseline, by = "seed") %>%
+    mutate(mode = str_extract(scenario, "^[A-Z]+"),
+           share_pct = as.integer(str_extract(scenario, "[0-9]+(?=%$)")),
+           averted_pct = 100 * (baseline_value - .data[[policy_metric]]) / baseline_value) %>%
+    group_by(mode, share_pct) %>%
+    summarise(lo = min(averted_pct), hi = max(averted_pct), n = n(), .groups = "drop")
+  stopifnot(all(policy_seed_range$n == policy_expected_seeds))
+}
+
+# Stack components (each bar sums to 100%) ----------------------------------
+lbl_random    <- "Averted by random quarantine of the same # of agents"
+lbl_targeting <- "Additionally averted by targeting inter-regional travelers"
+lbl_shortfall <- "Would have been averted by random quarantine instead"
+lbl_remaining <- paste("Remaining", policy_metric_label)
+
+policy_component_colours <- setNames(
+  c("#E0E0E0", "#CC79A7", "#D55E00", "#0072B2"),
+  c(lbl_remaining, lbl_shortfall, lbl_targeting, lbl_random))
+
+# First factor level is drawn on top of the stack
+stack_levels <- c(lbl_remaining, lbl_shortfall, lbl_targeting, lbl_random)
+
+general_segments <- policy_effects %>%
+  transmute(share_pct,
+            !!lbl_random := GENERAL,
+            !!lbl_remaining := 100 - GENERAL) %>%
+  pivot_longer(-share_pct, names_to = "component", values_to = "pct")
+
+commuter_segments <- policy_effects %>%
+  transmute(share_pct,
+            !!lbl_random := pmin(COMMUTERS, GENERAL),
+            !!lbl_targeting := pmax(COMMUTERS - GENERAL, 0),
+            !!lbl_shortfall := pmax(GENERAL - COMMUTERS, 0),
+            !!lbl_remaining := 100 - pmax(COMMUTERS, GENERAL)) %>%
+  pivot_longer(-share_pct, names_to = "component", values_to = "pct")
+
+prepare_segments <- function(segments) {
+  segments %>%
+    filter(policy_show_remaining | component != lbl_remaining) %>%
+    mutate(component = factor(component, levels = stack_levels))
+}
+general_segments <- prepare_segments(general_segments)
+commuter_segments <- prepare_segments(commuter_segments)
+
+# Common y-range so both panels are directly comparable
+range_values <- c(0, policy_effects$COMMUTERS, policy_effects$GENERAL,
+                  if (!is.null(policy_seed_range)) c(policy_seed_range$lo, policy_seed_range$hi))
+policy_y_limits <- c(min(range_values),
+                     if (policy_show_remaining) 100 else max(range_values) * 1.1)
+
+# Plot ----------------------------------------------------------------------
+plot_policy_stack <- function(mode_name, segments, title) {
+  net <- policy_effects %>% transmute(share_pct, averted = .data[[mode_name]])
+  if (!is.null(policy_seed_range)) {
+    net <- net %>% left_join(filter(policy_seed_range, mode == mode_name), by = "share_pct") %>%
+      mutate(label_y = pmax(averted, hi))
+  } else {
+    net <- net %>% mutate(label_y = averted)
+  }
+
+  p <- ggplot(segments, aes(factor(share_pct), pct, fill = component)) +
+    geom_col(width = 0.75, colour = "white", linewidth = 0.2) +
+    geom_hline(yintercept = 0, linewidth = 0.3)
+  if (!is.null(policy_seed_range)) {
+    p <- p + geom_errorbar(data = net, aes(factor(share_pct), ymin = lo, ymax = hi),
+                           inherit.aes = FALSE, width = 0.25, linewidth = 0.4)
+  }
+  p +
+    geom_text(data = net, aes(factor(share_pct), label_y, label = sprintf("%.0f%%", averted)),
+              inherit.aes = FALSE, vjust = -0.5, size = 3.5) +
+    scale_fill_manual(values = policy_component_colours, drop = FALSE,
+                      breaks = rev(stack_levels[stack_levels %in% unique(c(
+                        as.character(general_segments$component),
+                        as.character(commuter_segments$component)))])) +
+    scale_x_discrete(labels = function(x) paste0(x, "%")) +
+    scale_y_continuous(labels = label_percent(scale = 1),
+                       expand = expansion(mult = c(0, 0.06))) +
+    coord_cartesian(ylim = policy_y_limits) +
+    theme_minimal(base_size = 14) +
+    theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank()) +
+    labs(title = title, x = "Share of agents quarantined",
+         y = paste("Share of unrestricted", policy_metric_label), fill = NULL)
+}
+
+policy_stack_general <- plot_policy_stack("GENERAL", general_segments,
+                                          "General population")
+policy_stack_commuter <- plot_policy_stack("COMMUTERS", commuter_segments,
+                                           "Inter-regional travelers")
+
+brand_policy_stack_plot <- (policy_stack_commuter | policy_stack_general) +
+  patchwork::plot_layout(guides = "collect") +
+  patchwork::plot_annotation(
+    subtitle = paste0("Policy start: ", format(ymd(policy_start), "%d.%m.%Y"),
+                      " | Evaluated: ", policy_window_label)) &
+  theme(legend.position = "bottom", legend.direction = "vertical")
+brand_policy_stack_plot
+
+policy_stack_commuter <- plot_policy_stack("COMMUTERS", commuter_segments,
+                                           "Inter-regional travelers") +
+  patchwork::plot_annotation(
+    subtitle = paste0("Policy start: ", format(ymd(policy_start), "%d.%m.%Y"),
+                      " | Evaluated: ", policy_window_label)) &
+  theme(legend.position = "bottom", legend.direction = "vertical")
+
+
+
+ggsave(paste0(policy_output_prefix, "_stacked_", policy_metric, ".pdf"),
+       brand_policy_stack_plot, width = 12, height = 6.5)
+ggsave(paste0(policy_output_prefix, "_stacked_", policy_metric, ".png"),
+       brand_policy_stack_plot, width = 12, height = 6.5)
+
+ggsave(paste0(policy_output_prefix, "_stacked_irt_", policy_metric, ".pdf"),
+       policy_stack_commuter, width = 6, height = 6.5)
+ggsave(paste0(policy_output_prefix, "_stacked_irt_", policy_metric, ".png"),
+       policy_stack_commuter, width = 6, height = 6.5)
+
+write_csv(policy_effects,
+          paste0(policy_output_prefix, "_decomposition_", policy_metric, ".csv"))
+```
+
+# Brandenburg Policies: peak incidence vs. quarantine share
+
+Peak 7-day symptom-onset incidence relative to OFF (COMMUTERS 0%), as a function of the share of agents quarantined. Peaks are taken from `policy_peak_from` onwards, so that the first wave (which is identical in all scenarios) cannot mask the policy effect. Lines: peak of the 5-seed mean curve relative to the OFF mean curve. Ribbons / small points: per-seed peaks relative to the OFF run with the same seed. Bottom panel: how many percentage points more the peak is reduced by targeting commuters than by quarantining the same number of random agents.
+
+```{r brandenburg-policies-peak-vs-share}
+# Settings ------------------------------------------------------------------
+# Only count peaks from this date on. Use plot_start_date to include the first wave.
+policy_peak_from <- ymd(policy_start)
+
+policy_mode_colours <- c("Commuters" = "#D55E00", "General population" = "#0072B2")
+policy_mode_linetypes <- c("Commuters" = "solid", "General population" = "dashed")
+
+# Helpers -------------------------------------------------------------------
+parse_policy <- function(df) {
+  df %>% mutate(
+    mode = case_when(scenario == "Baseline" ~ "OFF",
+                     str_starts(scenario, "COMMUTERS") ~ "Commuters",
+                     str_starts(scenario, "GENERAL") ~ "General population"),
+    share_pct = if_else(scenario == "Baseline", 0L,
+                        as.integer(str_extract(scenario, "[0-9]+(?=%$)"))))
+}
+# OFF is the 0% point of both curves
+expand_baseline <- function(df) {
+  off <- filter(df, mode == "OFF")
+  bind_rows(filter(df, mode != "OFF"),
+            mutate(off, mode = "Commuters"),
+            mutate(off, mode = "General population"))
+}
+
+# Per-seed peaks, paired with the OFF run of the same seed -------------------
+peak_by_seed <- policy_daily %>%
+  filter(date >= policy_peak_from) %>%
+  group_by(scenario, seed) %>%
+  summarise(peak = max(incidence), peak_date = date[which.max(incidence)], .groups = "drop")
+peak_off_by_seed <- peak_by_seed %>% filter(scenario == "Baseline") %>%
+  select(seed, peak_off = peak)
+stopifnot(nrow(peak_off_by_seed) == policy_expected_seeds, all(peak_off_by_seed$peak_off > 0))
+peak_by_seed <- peak_by_seed %>%
+  inner_join(peak_off_by_seed, by = "seed") %>%
+  mutate(rel_peak = peak / peak_off) %>%
+  parse_policy() %>% expand_baseline()
+stopifnot(!anyNA(peak_by_seed$mode), !anyNA(peak_by_seed$share_pct))
+
+peak_range <- peak_by_seed %>%
+  group_by(mode, share_pct) %>%
+  summarise(lo = min(rel_peak), hi = max(rel_peak), n = n(), .groups = "drop")
+stopifnot(all(peak_range$n == policy_expected_seeds))
+
+# Peak of the mean curve, relative to the OFF mean curve ---------------------
+peak_mean <- policy_daily_mean %>%
+  filter(date >= policy_peak_from) %>%
+  group_by(scenario) %>%
+  summarise(peak = max(incidence), peak_date = date[which.max(incidence)], .groups = "drop") %>%
+  mutate(rel_peak = peak / peak[scenario == "Baseline"]) %>%
+  parse_policy() %>% expand_baseline() %>%
+  arrange(mode, share_pct)
+
+# Targeting gain = how much more the commuter policy lowers the peak ---------
+gap_by_seed <- peak_by_seed %>%
+  select(seed, share_pct, mode, rel_peak) %>%
+  pivot_wider(names_from = mode, values_from = rel_peak) %>%
+  mutate(gap = `General population` - Commuters)
+gap_range <- gap_by_seed %>%
+  group_by(share_pct) %>%
+  summarise(lo = min(gap), hi = max(gap), .groups = "drop")
+gap_mean <- peak_mean %>%
+  select(share_pct, mode, rel_peak) %>%
+  pivot_wider(names_from = mode, values_from = rel_peak) %>%
+  mutate(gap = `General population` - Commuters)
+stopifnot(!anyNA(gap_mean$gap))
+
+# Plots ---------------------------------------------------------------------
+share_axis <- scale_x_continuous(breaks = seq(0, 100, 10), labels = function(x) paste0(x, "%"),
+                                 expand = expansion(add = 2))
+
+peak_plot <- ggplot(peak_mean, aes(share_pct, rel_peak, colour = mode)) +
+  geom_hline(yintercept = 1, linewidth = 0.3, colour = "grey40") +
+  geom_ribbon(data = peak_range, aes(share_pct, ymin = lo, ymax = hi, fill = mode),
+              inherit.aes = FALSE, alpha = 0.15) +
+  geom_point(data = peak_by_seed, size = 1, alpha = 0.4) +
+  geom_line(aes(linetype = mode), linewidth = 1) +
+  geom_point(size = 2.2) +
+  scale_colour_manual(values = policy_mode_colours) +
+  scale_fill_manual(values = policy_mode_colours) +
+  scale_linetype_manual(values = policy_mode_linetypes) +
+  share_axis +
+  scale_y_continuous(labels = label_percent(), limits = c(0, NA),
+                     expand = expansion(mult = c(0, 0.05))) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(), axis.title.x = element_blank()) +
+  labs(y = "Peak incidence\n(% of OFF peak)", colour = NULL, fill = NULL, linetype = NULL)
+
+gap_plot <- ggplot(gap_mean, aes(share_pct, gap)) +
+  geom_hline(yintercept = 0, linewidth = 0.3, colour = "grey40") +
+  geom_ribbon(data = gap_range, aes(share_pct, ymin = lo, ymax = hi),
+              inherit.aes = FALSE, fill = "#D55E00", alpha = 0.15) +
+  geom_point(data = gap_by_seed, size = 1, alpha = 0.4, colour = "#D55E00") +
+  geom_line(linewidth = 1, colour = "#D55E00") +
+  geom_point(size = 2.2, colour = "#D55E00") +
+  share_axis +
+  scale_y_continuous(labels = label_number(scale = 100, suffix = " pp")) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Share of agents quarantined",
+       y = "Extra peak reduction\nfrom targeting")
+
+brand_peak_vs_share_plot <- (peak_plot / gap_plot) +
+  patchwork::plot_layout(heights = c(2, 1), guides = "collect") +
+  patchwork::plot_annotation(
+    title = "Brandenburg: peak incidence vs. quarantine share",
+    subtitle = paste0("Peak from ", format(policy_peak_from, "%d.%m.%Y"),
+                      " | Lines: mean over ", policy_expected_seeds,
+                      " seeds | Ribbons/points: per-seed values vs. OFF with the same seed")) &
+  theme(legend.position = "bottom")
+brand_peak_vs_share_plot
+
+ggsave(paste0(image_output_path, "results_brand_policies_peak_vs_share.pdf"),
+       brand_peak_vs_share_plot, width = 10, height = 8)
+ggsave(paste0(image_output_path, "results_brand_policies_peak_vs_share.png"),
+       brand_peak_vs_share_plot, width = 10, height = 8)
+write_csv(peak_mean %>% select(mode, share_pct, peak, peak_date, rel_peak),
+          paste0(image_output_path, "results_brand_policies_peak_vs_share.csv"))
+```
+
+# Brandenburg Policies: relative targeting gain
+
+Relative targeting gain = (reduction by COMMUTERS x%) / (reduction by GENERAL x%), where each reduction is 1 - outcome / OFF outcome. A gain of 1 means targeting commuters is exactly as good as quarantining the same number of random agents; 2 means it achieves twice the reduction. Outcomes are counted from `policy_peak_from` onwards (set in the peak-vs-share chunk). The ratio is unstable when the random policy barely reduces anything (small denominator), so values with a GENERAL reduction below `gain_min_reduction` are flagged and drawn as open circles. Error bars: range of per-seed gains (each seed vs. OFF with the same seed), using only seeds with a reliable denominator.
+
+```{r brandenburg-policies-targeting-gain}
+# Settings ------------------------------------------------------------------
+gain_min_reduction <- 0.02  # flag ratios where random quarantine reduces < 2%
+gain_metric_labels <- c(peak_incidence = "Peak incidence",
+                        infections = "Infections (incl. asymptomatic)",
+                        symptom_onsets = "Symptom onsets")
+
+# Outcomes per scenario, from policy_peak_from onwards ------------------------
+summarise_outcomes <- function(df) {
+  df %>% summarise(peak_incidence = max(incidence),
+                   infections = sum(infections),
+                   symptom_onsets = sum(symptom_onsets), .groups = "drop") %>%
+    pivot_longer(all_of(names(gain_metric_labels)), names_to = "metric", values_to = "value")
+}
+outcomes_by_seed <- policy_daily %>% filter(date >= policy_peak_from) %>%
+  group_by(scenario, seed) %>% summarise_outcomes()
+outcomes_mean <- policy_daily_mean %>% filter(date >= policy_peak_from) %>%
+  group_by(scenario) %>% summarise_outcomes()
+
+# Reduction relative to OFF (paired by seed where applicable) ----------------
+add_reduction <- function(df, keys) {
+  df %>% group_by(across(all_of(c(keys, "metric")))) %>%
+    mutate(off = value[scenario == "Baseline"]) %>% ungroup() %>%
+    mutate(reduction = 1 - value / off) %>%
+    filter(scenario != "Baseline") %>% parse_policy()
+}
+reduction_by_seed <- add_reduction(outcomes_by_seed, "seed")
+reduction_mean <- add_reduction(outcomes_mean, character(0))
+
+to_gain <- function(df, keys) {
+  df %>% select(all_of(c(keys, "metric", "share_pct", "mode", "reduction"))) %>%
+    pivot_wider(names_from = mode, values_from = reduction) %>%
+    rename(reduction_commuters = Commuters, reduction_general = `General population`) %>%
+    mutate(gain = reduction_commuters / reduction_general,
+           reliable = is.finite(gain) & reduction_general >= gain_min_reduction)
+}
+gain_mean <- to_gain(reduction_mean, character(0))
+gain_by_seed <- to_gain(reduction_by_seed, "seed")
+stopifnot(!anyNA(gain_mean$reduction_commuters), !anyNA(gain_mean$reduction_general))
+
+gain_range <- gain_by_seed %>%
+  group_by(metric, share_pct) %>%
+  summarise(n_reliable = sum(reliable),
+            lo = if (any(reliable)) min(gain[reliable]) else NA_real_,
+            hi = if (any(reliable)) max(gain[reliable]) else NA_real_,
+            .groups = "drop")
+
+gain_table <- gain_mean %>%
+  left_join(gain_range, by = c("metric", "share_pct")) %>%
+  mutate(metric = factor(metric, levels = names(gain_metric_labels),
+                         labels = gain_metric_labels)) %>%
+  arrange(metric, share_pct)
+
+# Table ---------------------------------------------------------------------
+knitr::kable(
+  gain_table %>% transmute(
+    Metric = metric, Share = paste0(share_pct, "%"),
+    `Reduction commuters` = percent(reduction_commuters, accuracy = 0.1),
+    `Reduction general` = percent(reduction_general, accuracy = 0.1),
+    `Targeting gain` = sprintf("%.2f", gain),
+    `Seed range` = if_else(is.na(lo), "–", sprintf("%.2f–%.2f", lo, hi)),
+    `Seeds used` = paste0(n_reliable, "/", policy_expected_seeds),
+    Reliable = if_else(reliable, "yes", "no (small denominator)")),
+  caption = paste0("Relative targeting gain from ", format(policy_peak_from, "%d.%m.%Y"),
+                   ". Gain = commuter reduction / random reduction; 1 = no benefit of targeting."))
+
+# Plot ----------------------------------------------------------------------
+gain_plot <- ggplot(gain_table, aes(share_pct, gain)) +
+  geom_hline(yintercept = 1, linewidth = 0.3, colour = "grey40") +
+  geom_errorbar(aes(ymin = lo, ymax = hi), width = 2, colour = "#D55E00", alpha = 0.6,
+                na.rm = TRUE) +
+  geom_line(data = filter(gain_table, reliable), colour = "#D55E00", linewidth = 1) +
+  geom_point(aes(shape = reliable), colour = "#D55E00", size = 2.4, fill = "white",
+             na.rm = TRUE) +
+  scale_shape_manual(values = c(`TRUE` = 16, `FALSE` = 21),
+                     labels = c(`TRUE` = "reliable",
+                                `FALSE` = paste0("random reduction < ",
+                                                 percent(gain_min_reduction))),
+                     name = NULL) +
+  facet_wrap(~ metric, nrow = 1) +
+  scale_x_continuous(breaks = seq(0, 100, 20), labels = function(x) paste0(x, "%"),
+                     limits = c(0, 100)) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(), legend.position = "bottom") +
+  labs(title = "Brandenburg: relative targeting gain",
+       subtitle = paste0("Commuter reduction / random reduction, from ",
+                         format(policy_peak_from, "%d.%m.%Y"),
+                         " | >1: targeting commuters beats random quarantine"),
+       x = "Share of agents quarantined", y = "Relative targeting gain")
+gain_plot
+
+ggsave(paste0(image_output_path, "results_brand_policies_targeting_gain.pdf"),
+       gain_plot, width = 13, height = 5)
+write_csv(gain_table, paste0(image_output_path, "results_brand_policies_targeting_gain.csv"))
 ```
 
 # Geospatial & Temporal Analysis
